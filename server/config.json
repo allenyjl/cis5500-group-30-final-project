@@ -1,0 +1,9 @@
+{
+    "rds_host": "project-database.ckn8whmflhxn.us-east-1.rds.amazonaws.com",
+    "rds_port": "5432",
+    "rds_user": "OceanGroup30",
+    "rds_password": "ac2(*TYx%lpQ",
+    "rds_db": "postgres",
+    "server_host": "localhost",
+    "server_port": "8080"
+  }
