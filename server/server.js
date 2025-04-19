@@ -9,9 +9,13 @@ app.use(cors({
 }));
 app.get('/test', routes.test);
 
-const PORT = config.server_port || 5000;
+
+app.get('/species/most-observed', routes.getMostObservedSpecies);
+app.get('/species/name/:scientificName', routes.getSpeciesByName);
+
+const PORT = config.server_port || 8080;
 app.listen(PORT, () => {
-  console.log(`Server running at http://${config.server_host}:${PORT}/`);
+  console.log(`Server running at http://localhost:${PORT}/`);
 });
 
 module.exports = app;

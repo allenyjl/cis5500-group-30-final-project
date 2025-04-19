@@ -37,6 +37,41 @@ const test = async (req, res) => {
   }
 };
 
+const getMostObservedSpecies = async (req, res) => {
+  try {
+    const result = await connection.query(`
+      SELECT sn.scientificname,
+             COUNT(*) AS obs_count
+      FROM obis o
+      JOIN scientific_names sn
+        ON o.aphiaid = sn.aphiaid
+      GROUP BY sn.scientificname
+      ORDER BY obs_count DESC
+      LIMIT 10;
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json([]);
+  }
+};
+
+const getSpeciesByName = async (req, res) => {
+  const { scientificName } = req.params;
+  try {
+    const result = await connection.query(
+      'SELECT * FROM scientific_names WHERE scientificname = $1;',
+      [scientificName]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json([]);
+  }
+};
+
 module.exports = {
   test,
+  getMostObservedSpecies,
+  getSpeciesByName,
 };
