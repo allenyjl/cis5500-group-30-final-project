@@ -18,7 +18,6 @@ function WODPage() {
         <thead>
           <tr>
             <th>Occurrence ID</th>
-            <th>Scientific Name</th>
             <th>Event Date</th>
           </tr>
         </thead>
@@ -26,7 +25,6 @@ function WODPage() {
           {data.map((row) => (
             <tr key={row.occurrenceid}>
               <td>{row.occurrenceid}</td>
-              <td>{row.scientificname}</td>
               <td>{row.eventdate}</td>
             </tr>
           ))}

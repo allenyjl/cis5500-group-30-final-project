@@ -36,3 +36,52 @@
     transform: rotate(360deg);
   }
 }
+
+/* Homepage Styles */
+.homepage-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+.homepage-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  line-height: 1.4;
+}
+.homepage-header h1 {
+  font-size: 2.75rem;
+  color: #004c6d;
+  margin-bottom: 0.5rem;
+}
+.homepage-header p {
+  font-size: 1.2rem;
+  color: #555;  
+}
+.homepage-nav {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.homepage-nav a {
+  text-decoration: none;
+  color: #007acc;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border: 2px solid #007acc;
+  border-radius: 4px;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+.homepage-nav a:hover {
+  background-color: #007acc;
+  color: #ffffff;
+}
+@media (max-width: 600px) {
+  .homepage-header h1 {
+    font-size: 2rem;
+  }
+  .homepage-nav a {
+    flex: 1 1 100%;
+    text-align: center;
+  }
+}

@@ -26,11 +26,9 @@ router.get('/', (req, res) => {
 const test = async (req, res) => {
   try {
     const result = await connection.query(`
-      SELECT "OBIS"."occurrenceID" as occurrenceid, 
-       "OBIS"."scientificName" as scientificname, 
-       "OBIS"."eventDate" as eventdate
-       FROM "OBIS"
-       LIMIT 10;
+      SELECT obis.id AS occurrenceid, obis."eventDate" AS eventdate
+      FROM obis
+      LIMIT 10;
     `);
     res.json(result.rows);
   } catch (err) {
