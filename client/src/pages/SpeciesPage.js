@@ -28,6 +28,25 @@ export default function SpeciesPage() {
       .finally(() => setLoadingSearch(false));
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
+  };
+
+  const formatCoordinate = (coord) => {
+    if (coord === null || coord === undefined) return 'N/A';
+    return parseFloat(coord).toFixed(4);
+  };
+
+  const formatRegion = (regionId) => {
+    if (!regionId) return 'Unknown';
+    // Format regionId from camelCase to Title Case with spaces
+    return regionId
+      .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+      .replace(/^./, str => str.toUpperCase()); // Capitalize first letter
+  };
+
   return (
     <div className="species-page">
       <h1>Species Page</h1>
@@ -69,17 +88,21 @@ export default function SpeciesPage() {
           <table>
             <thead>
               <tr>
-                {Object.keys(searchResults[0]).map(col => (
-                  <th key={col}>{col}</th>
-                ))}
+                <th>Scientific Name</th>
+                <th>Region</th>
+                <th>Observation Date</th>
+                <th>Longitude</th>
+                <th>Latitude</th>
               </tr>
             </thead>
             <tbody>
               {searchResults.map((row, idx) => (
                 <tr key={idx}>
-                  {Object.values(row).map((val, j) => (
-                    <td key={j}>{val}</td>
-                  ))}
+                  <td>{row.scientificname}</td>
+                  <td>{formatRegion(row.region_id)}</td>
+                  <td>{formatDate(row.eventdate)}</td>
+                  <td>{formatCoordinate(row.longitude)}</td>
+                  <td>{formatCoordinate(row.latitude)}</td>
                 </tr>
               ))}
             </tbody>

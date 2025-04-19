@@ -159,3 +159,85 @@
   border-radius: 4px;
   margin: 1rem 0;
 }
+
+/* Species Page Styles */
+.species-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.species-page h1 {
+  color: #004c6d;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.species-page h2 {
+  color: #007acc;
+  margin-bottom: 1rem;
+  font-size: 1.4rem;
+}
+
+.species-page section {
+  margin-bottom: 2.5rem;
+  background-color: #f9f9f9;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.species-page table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.species-page th, .species-page td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.species-page th {
+  background-color: #007acc;
+  color: white;
+}
+
+.species-page tr:nth-child(even) {
+  background-color: #f2f2f2;
+}
+
+.species-page tr:hover {
+  background-color: #e6f7ff;
+}
+
+.species-page input {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-right: 0.5rem;
+  font-size: 1rem;
+  width: 60%;
+  max-width: 400px;
+}
+
+.species-page button {
+  padding: 0.5rem 1rem;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.3s ease;
+}
+
+.species-page button:hover {
+  background-color: #005a9c;
+}
+
+.species-page p {
+  color: #555;
+  margin: 1rem 0;
+}
