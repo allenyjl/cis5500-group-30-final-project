@@ -85,3 +85,77 @@
     text-align: center;
   }
 }
+
+/* Map Page Styles */
+.map-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.map-page h1 {
+  color: #004c6d;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.region-selector {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.region-selector select {
+  padding: 0.5rem 1rem;
+  margin-left: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.data-section {
+  margin-bottom: 2.5rem;
+  background-color: #f9f9f9;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.data-section h2 {
+  color: #007acc;
+  margin-bottom: 1rem;
+  font-size: 1.4rem;
+}
+
+.map-page table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.map-page th, .map-page td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.map-page th {
+  background-color: #007acc;
+  color: white;
+}
+
+.map-page tr:nth-child(even) {
+  background-color: #f2f2f2;
+}
+
+.map-page tr:hover {
+  background-color: #e6f7ff;
+}
+
+.error {
+  color: #d32f2f;
+  text-align: center;
+  padding: 1rem;
+  background-color: #ffebee;
+  border-radius: 4px;
+  margin: 1rem 0;
+}
