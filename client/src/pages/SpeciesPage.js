@@ -30,8 +30,11 @@ export default function SpeciesPage() {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
+    const cleanDateString = dateString.split('T')[0];
+    const [year, month, day] = cleanDateString.split('-').map(num => parseInt(num, 10));
+    if (!year || !month || !day) return 'N/A';
+    
+    return `${month}/${day}/${year}`;
   };
 
   const formatCoordinate = (coord) => {
@@ -41,10 +44,9 @@ export default function SpeciesPage() {
 
   const formatRegion = (regionId) => {
     if (!regionId) return 'Unknown';
-    // Format regionId from camelCase to Title Case with spaces
     return regionId
-      .replace(/([A-Z])/g, ' $1') // Add space before capital letters
-      .replace(/^./, str => str.toUpperCase()); // Capitalize first letter
+      .replace(/([A-Z])/g, ' $1') 
+      .replace(/^./, str => str.toUpperCase());
   };
 
   return (
@@ -65,7 +67,7 @@ export default function SpeciesPage() {
             <tbody>
               {topSpecies.map((s, i) => (
                 <tr key={i}>
-                  <td>{s.scientificname}</td>
+                  <td>{s.scientificName}</td>
                   <td>{s.obs_count}</td>
                 </tr>
               ))}
@@ -98,9 +100,9 @@ export default function SpeciesPage() {
             <tbody>
               {searchResults.map((row, idx) => (
                 <tr key={idx}>
-                  <td>{row.scientificname}</td>
+                  <td>{row.scientificName}</td>
                   <td>{formatRegion(row.region_id)}</td>
-                  <td>{formatDate(row.eventdate)}</td>
+                  <td>{formatDate(row.eventDate)}</td>
                   <td>{formatCoordinate(row.longitude)}</td>
                   <td>{formatCoordinate(row.latitude)}</td>
                 </tr>

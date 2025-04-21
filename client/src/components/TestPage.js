@@ -4,8 +4,7 @@ function WODPage() {
   const [data, setData] = useState([]);
 
   useEffect(() => {
-    // Fetch data from the backend
-    fetch('http://localhost:8080/test') // Update the URL if needed
+    fetch('http://localhost:8080/test') 
       .then((response) => response.json())
       .then((data) => setData(data))
       .catch((error) => console.error('Error fetching WOD data:', error));

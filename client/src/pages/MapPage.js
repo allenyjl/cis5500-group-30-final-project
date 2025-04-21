@@ -71,12 +71,10 @@ export default function MapPage() {
     setSelectedRegion(e.target.value);
   };
 
-  // Format temperature value to 2 decimal places and add °C
   const formatTemperature = (temp) => {
     return temp ? `${parseFloat(temp).toFixed(2)} °C` : 'N/A';
   };
 
-  // Format salinity and pH values to 2 decimal places
   const formatValue = (value) => {
     return value ? parseFloat(value).toFixed(2) : 'N/A';
   };
@@ -171,7 +169,7 @@ export default function MapPage() {
                   <td>{item.region_id
                     .replace(/([A-Z])/g, ' $1')
                     .replace(/^./, str => str.toUpperCase())}</td>
-                  <td>{item.scientificname}</td>
+                  <td>{item.scientificName}</td>
                 </tr>
               ))}
             </tbody>

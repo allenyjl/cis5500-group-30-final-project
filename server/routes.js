@@ -41,12 +41,12 @@ const test = async (req, res) => {
 const getMostObservedSpecies = async (req, res) => {
   try {
     const result = await connection.query(`
-      SELECT sn.scientificname,
+      SELECT sn."scientificName",
              COUNT(*) AS obs_count
       FROM obis o
       JOIN scientific_names sn
         ON o.aphiaid = sn.aphiaid
-      GROUP BY sn.scientificname
+      GROUP BY sn."scientificName"
       ORDER BY obs_count DESC
       LIMIT 10;
     `);
@@ -76,13 +76,13 @@ const getSpeciesByName = async (req, res) => {
       ),
       observations AS (
         SELECT
-          sn.scientificname,
-          o."eventDate" AS eventDate,
-          o.longitude,
-          o.latitude
+          sn."scientificName",
+          o."eventDate",
+          o."decimalLongitude" AS longitude,
+          o."decimalLatitude" AS latitude
         FROM scientific_names sn
         JOIN obis o ON o.aphiaid = sn.aphiaid
-        WHERE sn.scientificname = $1
+        WHERE sn."scientificName" = $1
       ),
       observations_with_region AS (
         SELECT 
@@ -96,7 +96,7 @@ const getSpeciesByName = async (req, res) => {
       )
       SELECT * FROM observations_with_region
       WHERE region_id IS NOT NULL
-      ORDER BY eventDate DESC
+      ORDER BY "eventDate" DESC
       LIMIT 100;
       `,
       [scientificName]
@@ -166,7 +166,7 @@ const regionBounds = {
   },
 };
 
-// Fix: We need to update all queries with the region_boxes CTE
+
 const getRegionTemperature = async (req, res) => {
   try {
     const result = await connection.query(`
@@ -248,24 +248,25 @@ const getRegionSpecies = async (req, res) => {
       )
       SELECT DISTINCT
         rb.region_id,
-        sn.scientificname
+        sn."scientificName"
       FROM obis o
       JOIN scientific_names sn
         ON o.aphiaid = sn.aphiaid
       JOIN region_boxes rb
-        ON o.latitude  BETWEEN rb.min_lat AND rb.max_lat
-       AND o.longitude BETWEEN rb.min_lon AND rb.max_lon
+        ON o."decimalLatitude"  BETWEEN rb.min_lat AND rb.max_lat
+       AND o."decimalLongitude" BETWEEN rb.min_lon AND rb.max_lon
+       
     `;
 
     // If a specific region is requested, filter by it
     if (region && region !== 'all') {
       query += ` WHERE rb.region_id = $1`;
-      query += ` ORDER BY sn.scientificname`;
+      query += ` ORDER BY sn."scientificName"`;
       const result = await connection.query(query, [region]);
       res.json(result.rows);
     } else {
       // Otherwise return all regions
-      query += ` ORDER BY rb.region_id, sn.scientificname`;
+      query += ` ORDER BY rb.region_id, sn."scientificName"`;
       const result = await connection.query(query);
       res.json(result.rows);
     }
@@ -313,10 +314,59 @@ const getRegions = async (req, res) => {
   }
 };
 
-// Connect route handlers to router
+const getSpeciesMonthlyTrends = async (req, res) => {
+  const { scientificName } = req.params;
+  try {
+    const result = await connection.query(
+      `
+      WITH monthly_counts AS (
+        SELECT
+          EXTRACT(MONTH FROM (o."eventDate"::date))::INT AS month,
+          COUNT(*)                                    AS occ_count
+        FROM obis o
+        JOIN scientific_names sn
+          ON o.aphiaid = sn.aphiaid
+        WHERE sn."scientificName" = $1
+          AND EXTRACT(YEAR FROM (o."eventDate"::date))::INT = 2023
+        GROUP BY month
+      ),
+      monthly_wod AS (
+        SELECT
+          w.month,
+          AVG(w.temperature) AS avg_wod_temp
+        FROM wod w
+        WHERE w.year = 2023
+        GROUP BY w.month
+      )
+      SELECT
+        mc.month,
+        mc.occ_count,
+        prev.occ_count      AS prev_count,
+        CASE
+          WHEN prev.occ_count = 0 THEN NULL
+          ELSE 100.0 * (mc.occ_count - prev.occ_count) / prev.occ_count
+        END                  AS pct_change,
+        mw.avg_wod_temp
+      FROM monthly_counts mc
+      LEFT JOIN monthly_counts prev
+        ON prev.month = mc.month - 1
+      LEFT JOIN monthly_wod mw
+        ON mw.month   = mc.month
+      ORDER BY mc.month;
+      `,
+      [scientificName]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json([]);
+  }
+};
+
 router.get('/test', test);
 router.get('/species/most-observed', getMostObservedSpecies);
 router.get('/species/name/:scientificName', getSpeciesByName);
+router.get('/species/monthly-trends/:scientificName', getSpeciesMonthlyTrends);
 router.get('/regions', getRegions);
 router.get('/regions/temperature', getRegionTemperature);
 router.get('/regions/water-properties', getRegionSalinityAndPH);
@@ -328,6 +378,7 @@ module.exports = {
   test,
   getMostObservedSpecies,
   getSpeciesByName,
+  getSpeciesMonthlyTrends,
   getRegionTemperature,
   getRegionSalinityAndPH,
   getRegionSpecies,
