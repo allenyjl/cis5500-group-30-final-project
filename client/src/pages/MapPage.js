@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '../App.css';
+// Import Leaflet directly from CDN instead of the package
+// The CSS is already included in the index.html
 
 const API_URL = 'http://localhost:8080';
 
@@ -11,6 +13,11 @@ export default function MapPage() {
   const [speciesData, setSpeciesData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // New state for clicked coordinates
+  const [clickedCoords, setClickedCoords] = useState(null);
+  
+  // Reference to map container
+  const mapContainerRef = useRef(null);
 
   // Fetch the list of regions
   useEffect(() => {
@@ -78,6 +85,43 @@ export default function MapPage() {
   const formatValue = (value) => {
     return value ? parseFloat(value).toFixed(2) : 'N/A';
   };
+
+  // Initialize the map
+  useEffect(() => {
+    // Make sure the Leaflet library is loaded from the CDN
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+    script.crossOrigin = '';
+    script.async = true;
+    script.onload = initializeMap;
+    document.body.appendChild(script);
+    
+    function initializeMap() {
+      // Check if map container exists and Leaflet is loaded
+      if (mapContainerRef.current && window.L) {
+        // Create the map
+        const L = window.L;
+        const map = L.map(mapContainerRef.current).setView([20, 0], 2);
+        
+        // Add the OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Add the click event handler
+        map.on('click', function(e) {
+          setClickedCoords(e.latlng);
+        });
+      }
+    }
+    
+    return () => {
+      // Clean up script if component unmounts before script loads
+      document.querySelectorAll('script[src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"]')
+        .forEach(s => s.remove());
+    };
+  }, []);
 
   if (loading) return <div>Loading regions...</div>;
   if (error) return <div className="error">{error}</div>;
@@ -179,6 +223,28 @@ export default function MapPage() {
         )}
         {speciesData.length > 100 && (
           <p>Showing 100 of {speciesData.length} species.</p>
+        )}
+      </div>
+
+      <div className="data-section">
+        <h2>Interactive World Map</h2>
+        <div 
+          id="map" 
+          ref={mapContainerRef} 
+          style={{ 
+            height: '500px', 
+            width: '100%', 
+            margin: '20px 0',
+            zIndex: 0 // Ensure map doesn't interfere with other elements
+          }}
+        ></div>
+        
+        {clickedCoords && (
+          <div className="clicked-coords">
+            <h3>Clicked Coordinates</h3>
+            <p>Latitude: {clickedCoords.lat.toFixed(4)}</p>
+            <p>Longitude: {clickedCoords.lng.toFixed(4)}</p>
+          </div>
         )}
       </div>
     </div>

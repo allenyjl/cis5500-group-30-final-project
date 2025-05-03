@@ -160,6 +160,37 @@
   margin: 1rem 0;
 }
 
+/* Map Styles */
+.map-container {
+  margin: 20px 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.clicked-coords {
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+.clicked-coords h3 {
+  margin-top: 0;
+  color: #333;
+}
+
+.clicked-coords p {
+  margin: 5px 0;
+}
+
+/* Make sure the Leaflet map container is properly positioned */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+}
+
 /* Species Page Styles */
 .species-page {
   max-width: 1200px;
