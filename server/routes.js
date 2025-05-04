@@ -108,7 +108,7 @@ const getSpeciesByName = async (req, res) => {
   }
 };
 
-// Updated regionBounds with corrected boundaries
+
 const regionBounds = {
   northPacific_west: {
     minLat: 0.0,      // Equator
