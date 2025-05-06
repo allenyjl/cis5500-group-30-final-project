@@ -38,6 +38,11 @@ const test = async (req, res) => {
   }
 };
 
+
+
+// SPECIES PAGE ROUTES
+
+
 const getMostObservedSpecies = async (req, res) => {
   try {
     const result = await connection.query(`
@@ -110,59 +115,66 @@ const getSpeciesByName = async (req, res) => {
 
 
 const regionBounds = {
+  // Arctic Circle @ 66.5° N
+  // Equator @ 0° N
+  // South Pole @ -90° S
+  // North Pole @ 90° N
+  // negative coords are for West and South
+  // positive coords are for East and North
+
   northPacific_west: {
-    minLat: 0.0,      // Equator
-    maxLat: 66.5,     // Arctic Circle
-    minLon: 120.0,    // 120° E
-    maxLon: 180.0,    // 180°
+    minLat: 0.0,
+    maxLat: 66.5,
+    minLon: 120.0,
+    maxLon: 180.0,
   },
   northPacific_east: {
-    minLat: 0.0,      // Equator
-    maxLat: 66.5,     // Arctic Circle
-    minLon: -180.0,   // -180°
-    maxLon: -120.0,   // 120° W
+    minLat: 0.0,
+    maxLat: 66.5,
+    minLon: -180.0,
+    maxLon: -120.0,
   },
   southPacific_west: {
-    minLat: -60.0,    // 60° S
-    maxLat: 0.0,      // Equator
-    minLon: 120.0,    // 120° E
-    maxLon: 180.0,    // 180°
+    minLat: -60.0,
+    maxLat: 0.0,
+    minLon: 120.0,
+    maxLon: 180.0,
   },
   southPacific_east: {
-    minLat: -60.0,    // 60° S
-    maxLat: 0.0,      // Equator
-    minLon: -180.0,   // -180°
-    maxLon: -70.0,    // 70° W
+    minLat: -60.0,
+    maxLat: 0.0,
+    minLon: -180.0,
+    maxLon: -70.0,
   },
   northAtlantic: {
-    minLat: 0.0,      // Equator
-    maxLat: 66.5,     // Arctic Circle
-    minLon: -70.0,    // 70° W
-    maxLon: 20.0,     // 20° E
+    minLat: 0.0,
+    maxLat: 66.5,
+    minLon: -70.0,
+    maxLon: 20.0,
   },
   southAtlantic: {
-    minLat: -60.0,    // 60° S
-    maxLat: 0.0,      // Equator
-    minLon: -70.0,    // 70° W
-    maxLon: 20.0,     // 20° E
+    minLat: -60.0,    
+    maxLat: 0.0,      
+    minLon: -70.0,   
+    maxLon: 20.0,    
   },
   indianOcean: {
-    minLat: -60.0,    // 60° S
-    maxLat: 30.0,     // 30° N
-    minLon: 20.0,     // 20° E
-    maxLon: 146.5,    // 146.5° E
+    minLat: -60.0,
+    maxLat: 30.0,
+    minLon: 20.0,
+    maxLon: 146.5,
   },
   arcticOcean: {
-    minLat: 66.5,     // Arctic Circle
-    maxLat: 90.0,     // North Pole
-    minLon: -180.0,   // -180°
-    maxLon: 180.0,    // 180°
+    minLat: 66.5,
+    maxLat: 90.0,
+    minLon: -180.0,
+    maxLon: 180.0,
   },
   southernOcean: {
-    minLat: -90.0,    // South Pole
-    maxLat: -60.0,    // 60° S
-    minLon: -180.0,   // -180°
-    maxLon: 180.0,    // 180°
+    minLat: -90.0,
+    maxLat: -60.0,
+    minLon: -180.0,
+    maxLon: 180.0,
   },
 };
 
@@ -281,7 +293,6 @@ const getRegions = async (req, res) => {
   try {
     // Return a list of all ocean regions with some special handling for split regions
     const regions = Object.keys(regionBounds).map(region => {
-      // For the split Pacific regions, we'll provide a cleaner name for the UI
       if (region === 'northPacific_west' || region === 'northPacific_east') {
         return {
           id: region,
@@ -296,8 +307,8 @@ const getRegions = async (req, res) => {
         return {
           id: region,
           name: region
-            .replace(/([A-Z])/g, ' $1') // Add space before capital letters
-            .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+            .replace(/([A-Z])/g, ' $1') 
+            .replace(/^./, str => str.toUpperCase()) 
         };
       }
     });
@@ -363,6 +374,121 @@ const getSpeciesMonthlyTrends = async (req, res) => {
   }
 };
 
+
+
+
+
+
+
+
+// INTERACTIVE MAP PAGE ROUTE w/ 2 Queries:
+
+const getObisByCoordinates = async (req, res) => {
+  const { lat, lng } = req.params;
+  
+  try {
+    const parsedLat = parseFloat(lat);
+    const parsedLng = parseFloat(lng);
+    
+    const normLng = parsedLng < -180 ? parsedLng + 360 : 
+                   parsedLng > 180 ? parsedLng - 360 : parsedLng;
+    
+    let selectedRegion = null;
+    
+    for (const [regionKey, region] of Object.entries(regionBounds)) {
+      if (parsedLat >= region.minLat && 
+          parsedLat <= region.maxLat && 
+          normLng >= region.minLon && 
+          normLng <= region.maxLon) {
+        selectedRegion = {
+          id: regionKey,
+          name: regionKey
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/^./, str => str.toUpperCase()),
+          bounds: region
+        };
+        break;
+      }
+    }
+    
+    if (!selectedRegion) {
+      return res.status(404).json({ message: "No ocean region found for these coordinates" });
+    }
+    
+    const obisQuery = `
+      WITH region_data AS (
+        SELECT 
+          $1::text AS region_id,
+          $2::float AS min_lat,
+          $3::float AS max_lat, 
+          $4::float AS min_lon,
+          $5::float AS max_lon
+      )
+      SELECT 
+        o.id,
+        sn."scientificName",
+        o."decimalLatitude" AS latitude,
+        o."decimalLongitude" AS longitude,
+        o."dayOfYear",
+        o.sst,
+        o.sss,
+        o.depth
+      FROM obis o
+      JOIN scientific_names sn ON o.aphiaid = sn.aphiaid
+      JOIN region_data rd ON 
+        o."decimalLatitude" BETWEEN rd.min_lat AND rd.max_lat AND
+        o."decimalLongitude" BETWEEN rd.min_lon AND rd.max_lon
+      LIMIT 100;
+    `;
+    
+    const climateQuery = `
+      WITH region_data AS (
+        SELECT 
+          $1::text AS region_id,
+          $2::float AS min_lat,
+          $3::float AS max_lat, 
+          $4::float AS min_lon,
+          $5::float AS max_lon
+      )
+      SELECT 
+        AVG(o.sst) AS avg_sst,
+        AVG(o.sss) AS avg_sss,
+        COUNT(*) AS total_observations
+      FROM obis o
+      JOIN region_data rd ON 
+        o."decimalLatitude" BETWEEN rd.min_lat AND rd.max_lat AND
+        o."decimalLongitude" BETWEEN rd.min_lon AND rd.max_lon
+      WHERE o.sst IS NOT NULL OR o.sss IS NOT NULL;
+    `;
+    
+    const [obisResult, climateResult] = await Promise.all([
+      connection.query(obisQuery, [
+        selectedRegion.id,
+        selectedRegion.bounds.minLat,
+        selectedRegion.bounds.maxLat,
+        selectedRegion.bounds.minLon,
+        selectedRegion.bounds.maxLon
+      ]),
+      connection.query(climateQuery, [
+        selectedRegion.id,
+        selectedRegion.bounds.minLat,
+        selectedRegion.bounds.maxLat,
+        selectedRegion.bounds.minLon,
+        selectedRegion.bounds.maxLon
+      ])
+    ]);
+    
+    res.json({
+      region: selectedRegion,
+      obisEntries: obisResult.rows,
+      climate: climateResult.rows[0]
+    });
+  } catch (err) {
+    console.error('Error getting OBIS data by coordinates:', err);
+    res.status(500).json({ error: 'Server error fetching data' });
+  }
+};
+
 router.get('/test', test);
 router.get('/species/most-observed', getMostObservedSpecies);
 router.get('/species/name/:scientificName', getSpeciesByName);
@@ -372,6 +498,7 @@ router.get('/regions/temperature', getRegionTemperature);
 router.get('/regions/water-properties', getRegionSalinityAndPH);
 router.get('/regions/species/:region', getRegionSpecies);
 router.get('/regions/species', getRegionSpecies);
+router.get('/obis/coordinates/:lat/:lng', getObisByCoordinates);
 
 module.exports = {
   router,
@@ -383,4 +510,5 @@ module.exports = {
   getRegionSalinityAndPH,
   getRegionSpecies,
   getRegions,
+  getObisByCoordinates,
 };
