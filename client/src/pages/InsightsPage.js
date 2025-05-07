@@ -27,7 +27,7 @@ export default function InsightsPage() {
       .then(data => {
         setMonthlyTrends(data);
         if (data.length === 0) {
-          setError(`No data found for ${searchName} in 2023. Try another species name.`);
+          setError(`No data found for ${searchName} in 2015. Try another species name.`);
         }
       })
       .catch(err => {
@@ -57,7 +57,7 @@ export default function InsightsPage() {
       <h1>Species Monthly Trends & Temperature Insights</h1>
       
       <section>
-        <h2>Monthly Occurrence Trends vs. Ocean Temperature (2023)</h2>
+        <h2>Monthly Occurrence Trends vs. Ocean Temperature (2015)</h2>
         <p>
           This analysis shows the relationship between monthly species observations and ocean 
           temperature from the World Ocean Database. Enter a scientific name to see how the 
@@ -109,7 +109,7 @@ export default function InsightsPage() {
             <div className="trends-summary">
               <h4>Insights</h4>
               <p>
-                This data shows the monthly occurrence patterns of {searchName} throughout 2023,
+                This data shows the monthly occurrence patterns of {searchName} throughout 2015,
                 alongside average ocean temperatures. Patterns may indicate seasonal migration,
                 breeding cycles, or sampling biases.
               </p>
