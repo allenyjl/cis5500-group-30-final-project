@@ -374,6 +374,25 @@ const getSpeciesMonthlyTrends = async (req, res) => {
   }
 };
 
+// Currently fecthces all species depending on name serached (limited 10 for now but can do lazy pagination later)
+const getAllSpecies = async(req, res) => {
+  const name = req.query.name ?? '';
+
+  connection.query(`
+    SELECT *
+    FROM obis NATURAL JOIN scientific_names
+    WHERE "scientificName" ILIKE $1
+    LIMIT 10
+  `, [`%${name}%`], (err, data) => {
+      if (err) {
+        console.log('Error:', err);
+        res.json([]);
+      } else {
+        res.json(data.rows);
+      }
+    })
+}
+
 
 
 
@@ -500,6 +519,8 @@ router.get('/regions/species/:region', getRegionSpecies);
 router.get('/regions/species', getRegionSpecies);
 router.get('/obis/coordinates/:lat/:lng', getObisByCoordinates);
 
+router.get('/species/search', getAllSpecies);
+
 module.exports = {
   router,
   test,
@@ -511,4 +532,5 @@ module.exports = {
   getRegionSpecies,
   getRegions,
   getObisByCoordinates,
+  getAllSpecies
 };
