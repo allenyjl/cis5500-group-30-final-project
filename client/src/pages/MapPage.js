@@ -215,9 +215,9 @@ export default function MapPage() {
           fetchObisData(lat, lng);
         });
         
-        setTimeout(() => {
+        map.whenReady(() => {
           map.invalidateSize(true);
-        }, 500);
+        });
         
         console.log("Map initialized successfully");
       } catch (error) {
@@ -260,12 +260,12 @@ export default function MapPage() {
   
   useEffect(() => {
     const resizeTimer = setTimeout(() => {
-      if (mapInstanceRef.current) {
+      if (mapInstanceRef.current && mapInstanceRef.current._loaded) {
         console.log('Forcing map resize...');
         mapInstanceRef.current.invalidateSize(true);
       }
     }, 1000);
-
+  
     return () => clearTimeout(resizeTimer);
   }, []);
 
