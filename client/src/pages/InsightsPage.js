@@ -13,8 +13,6 @@ export default function InsightsPage() {
   const [monthlyTrends, setMonthlyTrends] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
-  // State for species shifts data
   const [shiftsData, setShiftsData] = useState([]);
   const [loadingShifts, setLoadingShifts] = useState(false);
   const [shiftsError, setShiftsError] = useState(null);
@@ -26,11 +24,10 @@ export default function InsightsPage() {
     newEndDate: '2015-12-31'
   });
 
-  // Pre-defined date periods for common analyses
   const predefinedPeriods = [
     { 
       name: "Winter vs Summer", 
-      oldStartDate: '2015-12-01', 
+      oldStartDate: '2015-01-01', 
       oldEndDate: '2015-02-28', 
       newStartDate: '2015-06-01', 
       newEndDate: '2015-08-31' 
@@ -58,7 +55,6 @@ export default function InsightsPage() {
     }
   ];
 
-  // Function to apply a predefined period
   const applyPredefinedPeriod = (periodIndex) => {
     const period = predefinedPeriods[periodIndex];
     setShiftsFilter({
@@ -70,7 +66,6 @@ export default function InsightsPage() {
     });
   };
 
-  // For debugging
   useEffect(() => {
     console.log('Current shifts filter:', shiftsFilter);
   }, [shiftsFilter]);
@@ -80,7 +75,6 @@ export default function InsightsPage() {
     setLoading(true);
     setError(null);
     
-    // Clear any previous shift data when searching for a new species
     setShiftsData([]);
     setShiftsError(null);
 
@@ -102,9 +96,7 @@ export default function InsightsPage() {
       .finally(() => setLoading(false));
   };
 
-  // Function to fetch species shifts data
   const handleFetchShifts = () => {
-    // Don't fetch shifts data if no species name has been searched yet
     if (!searchName) {
       setShiftsError('Please search for a species first to see its geographic shifts');
       return;
@@ -112,8 +104,7 @@ export default function InsightsPage() {
     
     setLoadingShifts(true);
     setShiftsError(null);
-    
-    // Ensure dates are all formatted YYYY-MM-DD
+
     const formattedFilters = {
       ...shiftsFilter,
       oldStartDate: shiftsFilter.oldStartDate.substring(0, 10),
@@ -141,7 +132,6 @@ export default function InsightsPage() {
       .then(data => {
         setShiftsData(data);
         if (data.length === 0) {
-          // Provide a more informative error message
           setShiftsError(`No geographic shifts found for ${searchName} with the current parameters. This species may not have enough observations (minimum ${shiftsFilter.minCount}) in both time periods selected.`);
         }
       })
@@ -167,29 +157,25 @@ export default function InsightsPage() {
     return `${parseFloat(temp).toFixed(2)} °C`;
   };
   
-  // Function to format distance
   const formatDistance = (dist) => {
     if (dist === null || dist === undefined) return 'N/A';
     return `${parseFloat(dist).toFixed(2)} km`;
   };
-  
-  // Function to format coordinates
+
   const formatCoordinate = (coord) => {
     if (coord === null || coord === undefined) return 'N/A';
     return parseFloat(coord).toFixed(4);
   };
 
-  // Function to format date for display
   const formatDateForDisplay = (dateString) => {
-    const date = new Date(dateString);
+    const date = new Date(dateString + 'T00:00:00');
+    date.setDate(date.getDate());
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   return (
     <div className="species-page">
       <h1>Species Insights Dashboard</h1>
-      
-      {/* Global species selection section at the top */}
       <section className="global-species-selection">
         <h2>Learn insights about a marine species</h2>
         <p>

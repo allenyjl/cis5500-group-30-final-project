@@ -595,6 +595,11 @@ const getSpeciesMonthlyTrends = async (req, res) => {
   }
 };
 
+
+
+
+
+
 const getSpeciesShifts = async (req, res) => {
   const { 
     minCount = 10, 
@@ -606,7 +611,6 @@ const getSpeciesShifts = async (req, res) => {
   } = req.query;
   
   try {
-    // Only proceed if scientificName is provided
     if (!scientificName) {
       return res.status(400).json({ error: 'Scientific name is required' });
     }
@@ -615,234 +619,86 @@ const getSpeciesShifts = async (req, res) => {
     console.log(`Time periods: ${oldStartDate} to ${oldEndDate} and ${newStartDate} to ${newEndDate}`);
     console.log(`Minimum count: ${minCount}`);
 
-    // Convert dates to day-of-year values for the query (1-366)
     const getDayOfYear = (dateString) => {
       try {
-        // Parse the input date string
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) {
-          console.error(`Invalid date provided: ${dateString}`);
-          return null;
+        // edge cases for dates
+        if (dateString === '2015-01-01') {
+          console.log('Detected January 1st, returning day 1');
+          return 1;
         }
-        
-        // Force the year to 2015 to ensure consistency
-        const fixedYear = 2015;
-        
-        // Create a date object for the input date but with year forced to 2015
-        const adjustedDate = new Date(fixedYear, date.getMonth(), date.getDate());
-        
-        // Create Jan 1st of the same year
-        const firstDayOfYear = new Date(fixedYear, 0, 1);
-        
-        // Calculate difference in days
-        const diff = adjustedDate - firstDayOfYear;
-        const oneDay = 1000 * 60 * 60 * 24;
+        if (dateString === '2015-12-31') {
+          console.log('Detected December 31st, returning day 365');
+          return 365;
+        }
+        const [year, month, day] = dateString.split('-').map(num => parseInt(num, 10));
+        const specifiedDate = new Date(2015, month - 1, day);
+        const firstDayOfYear = new Date(2015, 0, 1);
+        const diff = specifiedDate - firstDayOfYear;
+        const oneDay = 24 * 60 * 60 * 1000;
         const dayOfYear = Math.floor(diff / oneDay) + 1;
         
         console.log(`Converted ${dateString} to day of year: ${dayOfYear}`);
         return dayOfYear;
       } catch (err) {
         console.error(`Error converting date ${dateString}: ${err.message}`);
-        return 1; // Default to day 1 on error
+        return 1;
       }
     };
 
-    // Handle a special case: if the date range crosses from December to January
-    let oldStart = getDayOfYear(oldStartDate);
-    let oldEnd = getDayOfYear(oldEndDate);
-    let newStart = getDayOfYear(newStartDate);
-    let newEnd = getDayOfYear(newEndDate);
-    
-    // Special handling for date ranges that cross year boundaries
-    // This is only needed if we're using dates from multiple years
-    // For ranges like "Dec 1 to Feb 28", we need WHERE dayOfYear >= 335 OR dayOfYear <= 59
-    let oldStartWhere, oldEndWhere, newStartWhere, newEndWhere;
-    let useCrossYearQuery = false;
-    
-    if (oldStart > oldEnd) {
-      console.log("First period crosses year boundary, using special query logic");
-      useCrossYearQuery = true;
-      oldStartWhere = `(o."dayOfYear" >= ${oldStart} OR o."dayOfYear" <= ${oldEnd})`;
-    } else {
-      oldStartWhere = `o."dayOfYear" BETWEEN ${oldStart} AND ${oldEnd}`;
-    }
-    
-    if (newStart > newEnd) {
-      console.log("Second period crosses year boundary, using special query logic");
-      useCrossYearQuery = true;
-      newStartWhere = `(o."dayOfYear" >= ${newStart} OR o."dayOfYear" <= ${newEnd})`;
-    } else {
-      newStartWhere = `o."dayOfYear" BETWEEN ${newStart} AND ${newEnd}`;
-    }
+    const oldStart = getDayOfYear(oldStartDate);
+    const oldEnd = getDayOfYear(oldEndDate);
+    const newStart = getDayOfYear(newStartDate);
+    const newEnd = getDayOfYear(newEndDate);
 
     console.log(`Query will use day values: ${oldStart}-${oldEnd} and ${newStart}-${newEnd}`);
-    
-    // Choose the appropriate query based on whether we have cross-year ranges
-    let query;
-    if (useCrossYearQuery) {
-      query = `
-        WITH first_half_observations AS (
-          -- Get species observations from the first period that meet minimum count
-          SELECT 
-            o.aphiaid,
-            COUNT(*) as count,
-            AVG(o."decimalLatitude") as avg_lat,
-            AVG(o."decimalLongitude") as avg_lon
-          FROM 
-            obis o
-          JOIN
-            scientific_names sn ON o.aphiaid = sn.aphiaid
-          WHERE 
-            ${oldStartWhere}
-            AND sn."scientificName" ILIKE $1
-          GROUP BY 
-            o.aphiaid
-          HAVING 
-            COUNT(*) >= $2
-        ),
-        second_half_observations AS (
-          -- Get species observations from the second period that meet minimum count
-          SELECT 
-            o.aphiaid,
-            COUNT(*) as count,
-            AVG(o."decimalLatitude") as avg_lat,
-            AVG(o."decimalLongitude") as avg_lon
-          FROM 
-            obis o
-          JOIN
-            scientific_names sn ON o.aphiaid = sn.aphiaid
-          WHERE 
-            ${newStartWhere}
-            AND sn."scientificName" ILIKE $1
-          GROUP BY 
-            o.aphiaid
-          HAVING 
-            COUNT(*) >= $2
-        ),
-        species_with_both_halves AS (
-          -- Find species that appear in both periods with sufficient observations
-          SELECT 
-            fh.aphiaid,
-            fh.avg_lat as first_half_lat,
-            fh.avg_lon as first_half_lon,
-            sh.avg_lat as second_half_lat,
-            sh.avg_lon as second_half_lon,
-            fh.count as first_half_count,
-            sh.count as second_half_count
-          FROM 
-            first_half_observations fh
-          JOIN 
-            second_half_observations sh ON fh.aphiaid = sh.aphiaid
-        )
-        -- Calculate distance between centroids (using Haversine formula)
-        SELECT 
-          sb.aphiaid as id,
-          sb.first_half_lat,
-          sb.first_half_lon,
-          sb.second_half_lat,
-          sb.second_half_lon,
-          sb.first_half_count,
-          sb.second_half_count,
-          -- Haversine formula to calculate distance in kilometers
-          2 * 6371 * ASIN(
-            SQRT(
-              POW(SIN(RADIANS(sb.second_half_lat - sb.first_half_lat) / 2), 2) + 
-              COS(RADIANS(sb.first_half_lat)) * COS(RADIANS(sb.second_half_lat)) * 
-              POW(SIN(RADIANS(sb.second_half_lon - sb.first_half_lon) / 2), 2)
-            )
-          ) as "shiftDist"
-        FROM 
-          species_with_both_halves sb
-        ORDER BY 
-          "shiftDist" DESC
-        LIMIT 100;
-      `;
-      
-      result = await connection.query(query, [`%${scientificName}%`, minCount]);
-      
-    } else {
-      // Standard query for non-crossing date ranges
-      query = `
-        WITH first_half_observations AS (
-          -- Get species observations from the first half of the year that meet minimum count
-          SELECT 
-            o.aphiaid,
-            COUNT(*) as count,
-            AVG(o."decimalLatitude") as avg_lat,
-            AVG(o."decimalLongitude") as avg_lon
-          FROM 
-            obis o
-          JOIN
-            scientific_names sn ON o.aphiaid = sn.aphiaid
-          WHERE 
-            o."dayOfYear" BETWEEN $1 AND $2
-            AND sn."scientificName" ILIKE $6
-          GROUP BY 
-            o.aphiaid
-          HAVING 
-            COUNT(*) >= $5
-        ),
-        second_half_observations AS (
-          -- Get species observations from the second half of the year that meet minimum count
-          SELECT 
-            o.aphiaid,
-            COUNT(*) as count,
-            AVG(o."decimalLatitude") as avg_lat,
-            AVG(o."decimalLongitude") as avg_lon
-          FROM 
-            obis o
-          JOIN
-            scientific_names sn ON o.aphiaid = sn.aphiaid
-          WHERE 
-            o."dayOfYear" BETWEEN $3 AND $4
-            AND sn."scientificName" ILIKE $6
-          GROUP BY 
-            o.aphiaid
-          HAVING 
-            COUNT(*) >= $5
-        ),
-        species_with_both_halves AS (
-          -- Find species that appear in both halves with sufficient observations
-          SELECT 
-            fh.aphiaid,
-            fh.avg_lat as first_half_lat,
-            fh.avg_lon as first_half_lon,
-            sh.avg_lat as second_half_lat,
-            sh.avg_lon as second_half_lon,
-            fh.count as first_half_count,
-            sh.count as second_half_count
-          FROM 
-            first_half_observations fh
-          JOIN 
-            second_half_observations sh ON fh.aphiaid = sh.aphiaid
-        )
-        -- Calculate distance between centroids (using Haversine formula)
-        SELECT 
-          sb.aphiaid as id,
-          sb.first_half_lat,
-          sb.first_half_lon,
-          sb.second_half_lat,
-          sb.second_half_lon,
-          sb.first_half_count,
-          sb.second_half_count,
-          -- Haversine formula to calculate distance in kilometers
-          2 * 6371 * ASIN(
-            SQRT(
-              POW(SIN(RADIANS(sb.second_half_lat - sb.first_half_lat) / 2), 2) + 
-              COS(RADIANS(sb.first_half_lat)) * COS(RADIANS(sb.second_half_lat)) * 
-              POW(SIN(RADIANS(sb.second_half_lon - sb.first_half_lon) / 2), 2)
-            )
-          ) as "shiftDist"
-        FROM 
-          species_with_both_halves sb
-        ORDER BY 
-          "shiftDist" DESC
-        LIMIT 100;
-      `;
-      
-      result = await connection.query(query, [oldStart, oldEnd, newStart, newEnd, minCount, `%${scientificName}%`]);
+    if (oldStart > oldEnd) {
+      console.log(`Warning: First period start day (${oldStart}) is after end day (${oldEnd}). Swapping these values.`);
+      const temp = oldStart;
+      oldStart = oldEnd;
+      oldEnd = temp;
     }
 
+    const query = `
+      WITH first_half_observations AS (
+        -- Get species observations from the first period that meet minimum count
+        SELECT o.aphiaid, COUNT(*) as count, AVG(o."decimalLatitude") as avg_lat, AVG(o."decimalLongitude") as avg_lon
+        FROM obis o JOIN scientific_names sn ON o.aphiaid = sn.aphiaid
+        WHERE o."dayOfYear" BETWEEN $1 AND $2 AND sn."scientificName" ILIKE $6
+        GROUP BY o.aphiaid
+        HAVING COUNT(*) >= $5
+      ),
+      second_half_observations AS (
+        -- Get species observations from the second period that meet minimum count
+        SELECT o.aphiaid, COUNT(*) as count, AVG(o."decimalLatitude") as avg_lat, AVG(o."decimalLongitude") as avg_lon
+        FROM obis o
+        JOIN scientific_names sn ON o.aphiaid = sn.aphiaid
+        WHERE o."dayOfYear" BETWEEN $3 AND $4 AND sn."scientificName" ILIKE $6
+        GROUP BY o.aphiaid
+        HAVING COUNT(*) >= $5
+      ),
+      species_with_both_halves AS (
+        -- Find species that appear in both periods with sufficient observations
+        SELECT fh.aphiaid,fh.avg_lat as first_half_lat, fh.avg_lon as first_half_lon, sh.avg_lat as second_half_lat, 
+        sh.avg_lon as second_half_lon, fh.count as first_half_count, sh.count as second_half_count
+        FROM first_half_observations fh JOIN second_half_observations sh ON fh.aphiaid = sh.aphiaid
+      )
+      -- Calculate distance between centroids
+      SELECT sb.aphiaid as id, sb.first_half_lat, sb.first_half_lon, sb.second_half_lat, sb.second_half_lon, sb.first_half_count, sb.second_half_count,
+        -- Haversine formula to calculate distance in kilometers
+        2 * 6371 * ASIN(
+          SQRT(
+            POW(SIN(RADIANS(sb.second_half_lat - sb.first_half_lat) / 2), 2) + 
+            COS(RADIANS(sb.first_half_lat)) * COS(RADIANS(sb.second_half_lat)) * 
+            POW(SIN(RADIANS(sb.second_half_lon - sb.first_half_lon) / 2), 2)
+          )
+        ) as "shiftDist"
+      FROM species_with_both_halves sb
+      ORDER BY "shiftDist" DESC
+      LIMIT 100;
+    `;
+    
+    result = await connection.query(query, [oldStart, oldEnd, newStart, newEnd, minCount, `%${scientificName}%`]);
+    
     console.log(`Found ${result.rows.length} results`);
     
     res.json(result.rows);
