@@ -41,6 +41,129 @@ const test = async (req, res) => {
 
 
 // SPECIES PAGE ROUTES
+const getSpeciesInfoById = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await connection.query(/* full SQL I gave earlier */);
+    res.json(result.rows[0] || {});
+  } catch (err) {
+    console.error(err);
+    res.status(500).json([]);
+  }
+};
+
+const getSpeciesShifts = async (req, res) => {
+  const { minCount, oldStart, oldEnd, newStart, newEnd } = req.query;
+  try {
+    const result = await connection.query(/* full SQL I gave earlier */);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json([]);
+  }
+};
+
+const searchSpecies = async (req, res) => {
+  console.log('--- /search_species called ---');
+console.log('query params:', req.query);
+  const {
+    scientificName,
+    marine,
+    brackish,
+    regions,
+    minSightings,
+    maxSightings,
+    minDepth,
+    maxDepth,
+    minTemperature,
+    maxTemperature,
+  } = req.query;
+
+  let query = `
+    SELECT sn.aphiaid AS id, sn."scientificName"
+    FROM scientific_names sn
+    JOIN obis o ON sn.aphiaid = o.aphiaid
+  `;
+  let where = [];
+  let params = [];
+  let idx = 1;
+
+  if (scientificName) {
+    where.push(`sn."scientificName" ILIKE $${idx++}`);
+    params.push(`%${scientificName}%`);
+  }
+
+  if (marine === 'true') {
+    where.push(`o.marine = $${idx++}`);
+    params.push(true);
+  }
+  if (brackish === 'true') {
+    where.push(`o.brackish = $${idx++}`);
+    params.push(true);
+  }
+
+  if (minDepth) {
+    where.push(`o.depth >= $${idx++}`);
+    params.push(Number(minDepth));
+  }
+
+  if (maxDepth) {
+    where.push(`o.depth <= $${idx++}`);
+    params.push(Number(maxDepth));
+  }
+
+  if (minTemperature) {
+    where.push(`o.temperature >= $${idx++}`);
+    params.push(Number(minTemperature));
+  }
+
+  if (maxTemperature) {
+    where.push(`o.temperature <= $${idx++}`);
+    params.push(Number(maxTemperature));
+  }
+
+  if (regions) {
+    const regionList = regions.split(',');
+    where.push(`o.region_id = ANY($${idx++})`);
+    params.push(regionList);
+  }
+
+  if (minSightings || maxSightings) {
+    query = `
+      SELECT id, "scientificName" FROM (
+        SELECT sn.aphiaid AS id, sn."scientificName", COUNT(*) AS sightings
+        FROM scientific_names sn
+        JOIN obis o ON sn.aphiaid = o.aphiaid
+        ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+        GROUP BY sn.aphiaid, sn."scientificName"
+      ) sub
+      WHERE 1=1
+    `;
+    if (minSightings) {
+      query += ` AND sightings >= $${idx++}`;
+      params.push(Number(minSightings));
+    }
+    if (maxSightings) {
+      query += ` AND sightings <= $${idx++}`;
+      params.push(Number(maxSightings));
+    }
+  } else if (where.length) {
+    query += ' WHERE ' + where.join(' AND ');
+  }
+
+  query += ' GROUP BY sn.aphiaid, sn."scientificName" LIMIT 100';
+
+  try {
+    console.log('Final SQL:', query);
+console.log('Final params:', params);
+    const result = await connection.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error in search_species:', err);
+    res.status(500).json([]);
+  }
+};
+
 
 
 const getMostObservedSpecies = async (req, res) => {
@@ -81,13 +204,14 @@ const getSpeciesByName = async (req, res) => {
       ),
       observations AS (
         SELECT
+          o.id,
           sn."scientificName",
           o."eventDate",
           o."decimalLongitude" AS longitude,
           o."decimalLatitude" AS latitude
         FROM scientific_names sn
         JOIN obis o ON o.aphiaid = sn.aphiaid
-        WHERE sn."scientificName" = $1
+        WHERE sn."scientificName" ILIKE $1
       ),
       observations_with_region AS (
         SELECT 
@@ -104,7 +228,7 @@ const getSpeciesByName = async (req, res) => {
       ORDER BY "eventDate" DESC
       LIMIT 100;
       `,
-      [scientificName]
+      [`%${scientificName}%`]
     );
     res.json(result.rows);
   } catch (err) {
@@ -325,73 +449,29 @@ const getRegions = async (req, res) => {
   }
 };
 
-const getSpeciesMonthlyTrends = async (req, res) => {
-  const { scientificName } = req.params;
-  try {
-    const result = await connection.query(
-      `
-      WITH monthly_counts AS (
-        SELECT
-          EXTRACT(MONTH FROM (o."eventDate"::date))::INT AS month,
-          COUNT(*)                                    AS occ_count
-        FROM obis o
-        JOIN scientific_names sn
-          ON o.aphiaid = sn.aphiaid
-        WHERE sn."scientificName" = $1
-          AND EXTRACT(YEAR FROM (o."eventDate"::date))::INT = 2023
-        GROUP BY month
-      ),
-      monthly_wod AS (
-        SELECT
-          w.month,
-          AVG(w.temperature) AS avg_wod_temp
-        FROM wod w
-        WHERE w.year = 2023
-        GROUP BY w.month
-      )
-      SELECT
-        mc.month,
-        mc.occ_count,
-        prev.occ_count      AS prev_count,
-        CASE
-          WHEN prev.occ_count = 0 THEN NULL
-          ELSE 100.0 * (mc.occ_count - prev.occ_count) / prev.occ_count
-        END                  AS pct_change,
-        mw.avg_wod_temp
-      FROM monthly_counts mc
-      LEFT JOIN monthly_counts prev
-        ON prev.month = mc.month - 1
-      LEFT JOIN monthly_wod mw
-        ON mw.month   = mc.month
-      ORDER BY mc.month;
-      `,
-      [scientificName]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json([]);
-  }
-};
+
+
 
 // Currently fecthces all species depending on name serached (limited 10 for now but can do lazy pagination later)
-const getAllSpecies = async(req, res) => {
-  const name = req.query.name ?? '';
+const getAllSpecies = async (req, res) => {
+  const name = req.query.scientificName ?? '';
 
   connection.query(`
-    SELECT *
-    FROM obis NATURAL JOIN scientific_names
-    WHERE "scientificName" ILIKE $1
+    SELECT sn.aphiaid AS id, sn."scientificName"
+    FROM scientific_names sn
+    JOIN obis o ON sn.aphiaid = o.aphiaid
+    WHERE sn."scientificName" ILIKE $1
+    GROUP BY sn.aphiaid, sn."scientificName"
     LIMIT 10
   `, [`%${name}%`], (err, data) => {
-      if (err) {
-        console.log('Error:', err);
-        res.json([]);
-      } else {
-        res.json(data.rows);
-      }
-    })
-}
+    if (err) {
+      console.log('Error:', err);
+      res.json([]);
+    } else {
+      res.json(data.rows);
+    }
+  });
+};
 
 
 
@@ -519,6 +599,10 @@ router.get('/regions/species/:region', getRegionSpecies);
 router.get('/regions/species', getRegionSpecies);
 router.get('/obis/coordinates/:lat/:lng', getObisByCoordinates);
 
+router.get('/search_species', searchSpecies);
+router.get('/species/:id', getSpeciesInfoById);
+router.get('/species/shifts', getSpeciesShifts);
+
 router.get('/species/search', getAllSpecies);
 
 module.exports = {
@@ -532,5 +616,8 @@ module.exports = {
   getRegionSpecies,
   getRegions,
   getObisByCoordinates,
-  getAllSpecies
+  getAllSpecies,
+  getSpeciesInfoById,
+  getSpeciesShifts,
+  searchSpecies
 };
