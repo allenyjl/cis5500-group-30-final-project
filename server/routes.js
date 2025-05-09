@@ -42,19 +42,6 @@ const test = async (req, res) => {
 
 // SPECIES PAGE ROUTES
 
-
-
-const getSpeciesShifts = async (req, res) => {
-  const { minCount, oldStart, oldEnd, newStart, newEnd } = req.query;
-  try {
-    const result = await connection.query(/* full SQL I gave earlier */);
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json([]);
-  }
-};
-
 const getMarineBrackishCounts = async (req, res) => {
   try {
     const result = await connection.query(`
