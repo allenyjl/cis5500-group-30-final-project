@@ -44,16 +44,16 @@ const test = async (req, res) => {
 
 
 
-const getSpeciesShifts = async (req, res) => {
-  const { minCount, oldStart, oldEnd, newStart, newEnd } = req.query;
-  try {
-    const result = await connection.query(/* full SQL I gave earlier */);
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json([]);
-  }
-};
+// const getSpeciesShifts = async (req, res) => {
+//   const { minCount, oldStart, oldEnd, newStart, newEnd } = req.query;
+//   try {
+//     const result = await connection.query(/* full SQL I gave earlier */);
+//     res.json(result.rows);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json([]);
+//   }
+// };
 
 const getMarineBrackishCounts = async (req, res) => {
   try {
@@ -79,150 +79,80 @@ const getMarineBrackishCounts = async (req, res) => {
   }
 };
 
-const searchSpecies = async (req, res) => {
-  console.log('--- /search_species called ---');
-  console.log('query params:', req.query);
+const searchSpecies = (req, res) => {
+  console.log('Received request at /search_species');
+  console.log('Query params:', req.query);
 
-  const {
-    scientificName,
-    marine,
-    brackish,
-    regions,
-    minSightings,
-    maxSightings,
-    minDepth,
-    maxDepth,
-    minTemperature,
-    maxTemperature,
-  } = req.query;
+  // Add pagination parameters
+  const page = parseInt(req.query.page) || 1;
+  const pageSize = parseInt(req.query.page_size) || 10;
+  const offset = (page - 1) * pageSize;
 
-  let baseQuery = `
-    SELECT sn.aphiaid AS id, sn."scientificName", COUNT(*) AS sightings
-    FROM scientific_names sn
-    JOIN obis o ON sn.aphiaid = o.aphiaid
-    LEFT JOIN wod_2015 w 
-      ON o."dayOfYear" = w."dayOfYear"
+  // Required
+  const scientificName = req.query.scientificName ?? '';
+  if (!scientificName) {
+      return res.status(400).json({ error: 'Scientific name is required' });
+  }
+
+  // Always included with defaults
+  const depthMin = req.query.depth_min ?? 0;
+  const depthMax = req.query.depth_max ?? 11000;
+  const sightingsMin = req.query.sightings_min ?? 1;
+  const sightingsMax = req.query.sightings_max ?? 200000;
+
+  // Checkboxes (true/false)
+  const marine = req.query.marine === 'true';
+  const brackish = req.query.brackish === 'true';
+
+  // Temperature - only optional filter
+  const tempMin = req.query.temp_min;
+  const tempMax = req.query.temp_max;
+
+  // Base query - CORRECTED
+  let query = `
+  SELECT sn."scientificName", COUNT(*) as num_sightings
+  FROM scientific_names sn
+  JOIN obis o ON sn.aphiaid = o.aphiaid
   `;
 
-  const where = [];
-  const params = [];
-  let idx = 1;
+  // Add WHERE clause after JOIN
+  const whereClauses = [`sn."scientificName" ILIKE '${scientificName}%'`, `o.depth BETWEEN ${depthMin} AND ${depthMax}`];
 
-  if (scientificName) {
-    where.push(`sn."scientificName" ILIKE $${idx++}`);
-    params.push(`%${scientificName}%`);
+  // Habitat conditions
+  if (marine || brackish) {
+  const habitats = [];
+  if (marine) habitats.push('o.marine = true'); // Corrected: reference 'o' table
+  if (brackish) habitats.push('o.brackish = true'); // Corrected: reference 'o' table
+  whereClauses.push(`(${habitats.join(' OR ')})`);
   }
 
-  if (marine === 'true') {
-    where.push(`o.marine = $${idx++}`);
-    params.push(true);
-  }
-
-  if (brackish === 'true') {
-    where.push(`o.brackish = $${idx++}`);
-    params.push(true);
-  }
-
-  if (minDepth) {
-    where.push(`w.depth >= $${idx++}`);
-    params.push(Number(minDepth));
-  }
-
-  if (maxDepth) {
-    where.push(`w.depth <= $${idx++}`);
-    params.push(Number(maxDepth));
-  }
-
-  if (minTemperature) {
-    where.push(`w.temperature >= $${idx++}`);
-    params.push(Number(minTemperature));
-  }
-
-  if (maxTemperature) {
-    where.push(`w.temperature <= $${idx++}`);
-    params.push(Number(maxTemperature));
-  }
-
-  if (regions) {
-    const regionList = regions.split(',');
-    where.push(`o.region_id = ANY($${idx++})`);
-    params.push(regionList);
-  }
-
-  if (where.length > 0) {
-    baseQuery += ' WHERE ' + where.join(' AND ');
-  }
-
-  baseQuery += ' GROUP BY sn.aphiaid, sn."scientificName"';
-
-  let finalQuery = `
-    SELECT id, "scientificName", sightings FROM (
-      ${baseQuery}
-    ) AS sub
-    WHERE 1=1
+  // Add temperature conditions only if needed
+  if (tempMin !== undefined && tempMax !== undefined) {
+  query += `
+      LEFT JOIN wod_2015 w ON o.grid_id = w.grid_id
+                        AND o.depth_id = w.depth_id
+                        AND o."dayOfYear" = w."dayOfYear"
   `;
-
-  if (minSightings) {
-    finalQuery += ` AND sightings >= $${idx++}`;
-    params.push(Number(minSightings));
+  whereClauses.push(`(CASE WHEN w.temperature IS NOT NULL THEN w.temperature WHEN o.depth_id = 1 THEN o.sst END) BETWEEN ${tempMin} AND ${tempMax}`);
   }
 
-  if (maxSightings) {
-    finalQuery += ` AND sightings <= $${idx++}`;
-    params.push(Number(maxSightings));
+  if (whereClauses.length > 0) {
+  query += ` WHERE ${whereClauses.join(' AND ')}`;
   }
 
-  finalQuery += ' LIMIT 100';
+  query += ` GROUP BY sn."scientificName" HAVING COUNT(*) BETWEEN ${sightingsMin} AND ${sightingsMax}
+             ORDER BY num_sightings DESC
+             LIMIT ${pageSize} OFFSET ${offset}`;
 
-  try {
-    console.log('Final SQL:', finalQuery);
-    console.log('Final params:', params);
-    const result = await connection.query(finalQuery, params);
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Error in search_species with wod_2015 join:', err);
-    res.status(500).json([]);
-  }
-};
-
-
-const getSpeciesByMonth = async (req, res) => {
-  try {
-    const result = await connection.query(`
-      WITH month_observations AS (
-        SELECT 
-          CEIL("dayOfYear" / 30.5) AS month_num
-        FROM obis
-        WHERE "dayOfYear" IS NOT NULL
-        LIMIT 100000
-      )
-      SELECT 
-        CASE month_num
-          WHEN 1 THEN 'January'
-          WHEN 2 THEN 'February'
-          WHEN 3 THEN 'March'
-          WHEN 4 THEN 'April'
-          WHEN 5 THEN 'May'
-          WHEN 6 THEN 'June'
-          WHEN 7 THEN 'July'
-          WHEN 8 THEN 'August'
-          WHEN 9 THEN 'September'
-          WHEN 10 THEN 'October'
-          WHEN 11 THEN 'November'
-          WHEN 12 THEN 'December'
-          ELSE 'December'
-        END AS month,
-        COUNT(*) AS observation_count
-      FROM month_observations
-      GROUP BY month_num
-      ORDER BY month_num;
-    `);
-    
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Error fetching species by month:', err);
-    res.status(500).json([]);
-  }
+  connection.query(query, (err, data) => {
+      if (err) {
+          console.error('Error executing query:', err);
+          res.status(500).json({ error: 'Database error' });
+      } else {
+          console.log('Successfully returned data:', data.rows);
+          res.json(data.rows);
+      }
+  });
 };
 
 const getRandomSpecies = async (req, res) => {
@@ -856,7 +786,7 @@ router.get('/regions/species/:region', getRegionSpecies);
 router.get('/regions/species', getRegionSpecies);
 router.get('/obis/coordinates/:lat/:lng', getObisByCoordinates);
 router.get('/species/habitat-counts', getMarineBrackishCounts);
-router.get('/species/by-month', getSpeciesByMonth);
+// router.get('/species/by-month', getSpeciesByMonth);
 router.get('/search_species', searchSpecies);
 
 router.get('/species/shifts', getSpeciesShifts);
@@ -878,7 +808,7 @@ module.exports = {
   getRandomSpecies,
   getSpeciesShifts,
   getMarineBrackishCounts,
-  getSpeciesByMonth,
+  // getSpeciesByMonth,
   getSpeciesCooccurrence,
   searchSpecies
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import AdvancedSpeciesSearch from '../components/AdvancedSpeciesSearch';
 
 const API_URL = 'http://localhost:8080';
 
@@ -225,231 +226,122 @@ const handleFetchRandomSpecies = () => {
           )}
         </section>
       )}
-      <section>
-  <h2>Species by Habitat Type</h2>
-  {loadingHabitat ? (
-    <p>Loading habitat counts...</p>
-  ) : habitatCounts.length > 0 ? (
-    <table>
-      <thead>
-        <tr>
-          <th>Habitat Type</th>
-          <th>Species Count</th>
-        </tr>
-      </thead>
-      <tbody>
-        {habitatCounts.map((item, idx) => (
-          <tr key={idx}>
-            <td>{item.habitat_type}</td>
-            <td>{item.species_count}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <p>No habitat count data available.</p>
-  )}
-</section>
-<section>
-  <h2>Species Observations by Month</h2>
-  {loadingByMonth ? (
-    <p>Loading monthly data...</p>
-  ) : speciesByMonth.length > 0 ? (
-    <table>
-      <thead>
-        <tr>
-          <th>Month</th>
-          <th>Observation Count</th>
-        </tr>
-      </thead>
-      <tbody>
-        {speciesByMonth.map((item, idx) => (
-          <tr key={idx}>
-            <td>{item.month}</td>
-            <td>{item.observation_count}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <p>No monthly observation data available.</p>
-  )}
-</section>
-<section>
-  <h2>Top Species Co-occurrences</h2>
-  {loadingCooccurrence ? (
-    <p>Loading co-occurrence data...</p>
-  ) : cooccurrenceData.length > 0 ? (
-    <table>
-      <thead>
-        <tr>
-          <th>Species A</th>
-          <th>Species B</th>
-          <th>Times Together</th>
-        </tr>
-      </thead>
-      <tbody>
-        {cooccurrenceData.map((item, idx) => (
-          <tr key={idx}>
-            <td>{item.species_a}</td>
-            <td>{item.species_b}</td>
-            <td>{item.times_together}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <p>No co-occurrence data available.</p>
-  )}
-</section>
-<section>
-  <h2>Want to explore a new species? Generate a random species!</h2>
-  <button onClick={handleFetchRandomSpecies}>Get Random Species</button>
-  {loadingRandom ? (
-    <p>Loading random species...</p>
-  ) : randomSpecies.length > 0 ? (
-    <table style={{ marginTop: '15px' }}>
-      <thead>
-        <tr>
-          <th>Scientific Name</th>
-          <th>Observation Count</th>
-          <th>% of Total</th>
-          <th>Rarity Score</th>
-        </tr>
-      </thead>
-      <tbody>
-        {randomSpecies.map((item, idx) => (
-          <tr key={idx}>
-            <td>{item.scientificName}</td>
-            <td>{item.observation_count}</td>
-            <td>{parseFloat(item.percentage_of_total).toFixed(6)}%</td>
-            <td>{parseFloat(item.rarity_score).toFixed(6)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <p>No random species yet. Click the button above to discover!</p>
-  )}
-</section>
-
 
       <section>
-  <h2>Advanced Species Search</h2>
-  <p style={{ marginBottom: '10px' }}>
-    Use the filters below to narrow down species results by name, environment, sightings, depth, or temperature.
-  </p>
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '600px' }}>
-    <div>
-      <label>Scientific Name</label>
-      <input
-        type="text"
-        value={advancedFilters.scientificName}
-        onChange={e => setAdvancedFilters({ ...advancedFilters, scientificName: e.target.value })}
-        style={{ width: '100%' }}
-      />
-    </div>
+        <h2>Species by Habitat Type</h2>
+        {loadingHabitat ? (
+          <p>Loading habitat counts...</p>
+        ) : habitatCounts.length > 0 ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Habitat Type</th>
+                <th>Species Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {habitatCounts.map((item, idx) => (
+                <tr key={idx}>
+                  <td>{item.habitat_type}</td>
+                  <td>{item.species_count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p>No habitat count data available.</p>
+        )}
+      </section>
 
-    <div style={{ display: 'flex', gap: '20px' }}>
-      <label>
-        <input
-          type="checkbox"
-          checked={advancedFilters.marine}
-          onChange={e => setAdvancedFilters({ ...advancedFilters, marine: e.target.checked })}
-        /> Marine
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={advancedFilters.brackish}
-          onChange={e => setAdvancedFilters({ ...advancedFilters, brackish: e.target.checked })}
-        /> Brackish
-      </label>
-    </div>
+      <section>
+        <h2>Species Observations by Month</h2>
+        {loadingByMonth ? (
+          <p>Loading monthly data...</p>
+        ) : speciesByMonth.length > 0 ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Observation Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {speciesByMonth.map((item, idx) => (
+                <tr key={idx}>
+                  <td>{item.month}</td>
+                  <td>{item.observation_count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p>No monthly observation data available.</p>
+        )}
+      </section>
 
-    <div>
-      <label>Max Sightings</label>
-      <input
-        type="number"
-        value={advancedFilters.maxSightings}
-        onChange={e => setAdvancedFilters({ ...advancedFilters, maxSightings: e.target.value })}
-        style={{ width: '100%' }}
-      />
-    </div>
+      <section>
+        <h2>Top Species Co-occurrences</h2>
+        {loadingCooccurrence ? (
+          <p>Loading co-occurrence data...</p>
+        ) : cooccurrenceData.length > 0 ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Species A</th>
+                <th>Species B</th>
+                <th>Times Together</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cooccurrenceData.map((item, idx) => (
+                <tr key={idx}>
+                  <td>{item.species_a}</td>
+                  <td>{item.species_b}</td>
+                  <td>{item.times_together}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p>No co-occurrence data available.</p>
+        )}
+      </section>
 
-    <div style={{ display: 'flex', gap: '10px' }}>
-      <div style={{ flex: 1 }}>
-        <label>Min Depth</label>
-        <input
-          type="number"
-          value={advancedFilters.minDepth}
-          onChange={e => setAdvancedFilters({ ...advancedFilters, minDepth: e.target.value })}
-          style={{ width: '100%' }}
-        />
-      </div>
-      <div style={{ flex: 1 }}>
-        <label>Max Depth</label>
-        <input
-          type="number"
-          value={advancedFilters.maxDepth}
-          onChange={e => setAdvancedFilters({ ...advancedFilters, maxDepth: e.target.value })}
-          style={{ width: '100%' }}
-        />
-      </div>
-    </div>
+      <section>
+        <h2>Want to explore a new species? Generate a random species!</h2>
+        <button onClick={handleFetchRandomSpecies}>Get Random Species</button>
+        {loadingRandom ? (
+          <p>Loading random species...</p>
+        ) : randomSpecies.length > 0 ? (
+          <table style={{ marginTop: '15px' }}>
+            <thead>
+              <tr>
+                <th>Scientific Name</th>
+                <th>Observation Count</th>
+                <th>% of Total</th>
+                <th>Rarity Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {randomSpecies.map((item, idx) => (
+                <tr key={idx}>
+                  <td>{item.scientificName}</td>
+                  <td>{item.observation_count}</td>
+                  <td>{parseFloat(item.percentage_of_total).toFixed(6)}%</td>
+                  <td>{parseFloat(item.rarity_score).toFixed(6)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p>No random species yet. Click the button above to discover!</p>
+        )}
+      </section>
 
-    <div style={{ display: 'flex', gap: '10px' }}>
-      <div style={{ flex: 1 }}>
-        <label>Min Temp</label>
-        <input
-          type="number"
-          value={advancedFilters.minTemperature}
-          onChange={e => setAdvancedFilters({ ...advancedFilters, minTemperature: e.target.value })}
-          style={{ width: '100%' }}
-        />
-      </div>
-      <div style={{ flex: 1 }}>
-        <label>Max Temp</label>
-        <input
-          type="number"
-          value={advancedFilters.maxTemperature}
-          onChange={e => setAdvancedFilters({ ...advancedFilters, maxTemperature: e.target.value })}
-          style={{ width: '100%' }}
-        />
-      </div>
-    </div>
-
-    <button onClick={handleAdvancedSearch} style={{ marginTop: '10px', alignSelf: 'flex-start' }}>
-      Search
-    </button>
-  </div>
-
-  {loadingAdvanced ? (
-    <p>Loading advanced search...</p>
-  ) : advancedResults.length > 0 ? (
-    <table style={{ marginTop: '15px' }}>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Scientific Name</th>
-        </tr>
-      </thead>
-      <tbody>
-        {advancedResults.map((item, idx) => (
-          <tr key={idx}>
-            <td>{item.id}</td>
-            <td>{item.scientificName}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <p style={{ marginTop: '10px' }}>No advanced results yet.</p>
-  )}
-</section>
-
-
-      
+      <section>
+        <AdvancedSpeciesSearch />
+      </section>
     </div>
   );
 }
+
