@@ -41,31 +41,22 @@ const test = async (req, res) => {
 
 
 // SPECIES PAGE ROUTES
-const getSpeciesInfoById = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const result = await connection.query(/* full SQL I gave earlier */);
-    res.json(result.rows[0] || {});
-  } catch (err) {
-    console.error(err);
-    res.status(500).json([]);
-  }
-};
+// const getSpeciesInfoById = async (req, res) => {
+//   const { id } = req.params;
+//   try {
+//     const result = await connection.query(/* full SQL I gave earlier */);
+//     res.json(result.rows[0] || {});
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json([]);
+//   }
+// };
 
-const getSpeciesShifts = async (req, res) => {
-  const { minCount, oldStart, oldEnd, newStart, newEnd } = req.query;
-  try {
-    const result = await connection.query(/* full SQL I gave earlier */);
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json([]);
-  }
-};
+
 
 const searchSpecies = async (req, res) => {
   console.log('--- /search_species called ---');
-console.log('query params:', req.query);
+  console.log('query params:', req.query);
   const {
     scientificName,
     marine,
@@ -155,7 +146,7 @@ console.log('query params:', req.query);
 
   try {
     console.log('Final SQL:', query);
-console.log('Final params:', params);
+    console.log('Final params:', params);
     const result = await connection.query(query, params);
     res.json(result.rows);
   } catch (err) {
@@ -277,10 +268,10 @@ const regionBounds = {
     maxLon: 20.0,
   },
   southAtlantic: {
-    minLat: -60.0,    
-    maxLat: 0.0,      
-    minLon: -70.0,   
-    maxLon: 20.0,    
+    minLat: -60.0,
+    maxLat: 0.0,
+    minLon: -70.0,
+    maxLon: 20.0,
   },
   indianOcean: {
     minLat: -60.0,
@@ -431,17 +422,17 @@ const getRegions = async (req, res) => {
         return {
           id: region,
           name: region
-            .replace(/([A-Z])/g, ' $1') 
-            .replace(/^./, str => str.toUpperCase()) 
+            .replace(/([A-Z])/g, ' $1')
+            .replace(/^./, str => str.toUpperCase())
         };
       }
     });
-    
+
     // Filter to remove duplicates (since we have east/west regions with same display name)
-    const uniqueRegions = regions.filter((region, index, self) => 
+    const uniqueRegions = regions.filter((region, index, self) =>
       index === self.findIndex((r) => r.name === region.name)
     );
-    
+
     res.json(uniqueRegions);
   } catch (err) {
     console.error(err);
@@ -484,21 +475,21 @@ const getAllSpecies = async (req, res) => {
 
 const getObisByCoordinates = async (req, res) => {
   const { lat, lng } = req.params;
-  
+
   try {
     const parsedLat = parseFloat(lat);
     const parsedLng = parseFloat(lng);
-    
-    const normLng = parsedLng < -180 ? parsedLng + 360 : 
-                   parsedLng > 180 ? parsedLng - 360 : parsedLng;
-    
+
+    const normLng = parsedLng < -180 ? parsedLng + 360 :
+      parsedLng > 180 ? parsedLng - 360 : parsedLng;
+
     let selectedRegion = null;
-    
+
     for (const [regionKey, region] of Object.entries(regionBounds)) {
-      if (parsedLat >= region.minLat && 
-          parsedLat <= region.maxLat && 
-          normLng >= region.minLon && 
-          normLng <= region.maxLon) {
+      if (parsedLat >= region.minLat &&
+        parsedLat <= region.maxLat &&
+        normLng >= region.minLon &&
+        normLng <= region.maxLon) {
         selectedRegion = {
           id: regionKey,
           name: regionKey
@@ -509,57 +500,33 @@ const getObisByCoordinates = async (req, res) => {
         break;
       }
     }
-    
+
     if (!selectedRegion) {
       return res.status(404).json({ message: "No ocean region found for these coordinates" });
     }
-    
+
     const obisQuery = `
       WITH region_data AS (
-        SELECT 
-          $1::text AS region_id,
-          $2::float AS min_lat,
-          $3::float AS max_lat, 
-          $4::float AS min_lon,
-          $5::float AS max_lon
+        SELECT $1::text AS region_id, $2::float AS min_lat, $3::float AS max_lat, $4::float AS min_lon, $5::float AS max_lon
       )
-      SELECT 
-        o.id,
-        sn."scientificName",
-        o."decimalLatitude" AS latitude,
-        o."decimalLongitude" AS longitude,
-        o."dayOfYear",
-        o.sst,
-        o.sss,
-        o.depth
-      FROM obis o
-      JOIN scientific_names sn ON o.aphiaid = sn.aphiaid
-      JOIN region_data rd ON 
-        o."decimalLatitude" BETWEEN rd.min_lat AND rd.max_lat AND
-        o."decimalLongitude" BETWEEN rd.min_lon AND rd.max_lon
+      SELECT o.id, sn."scientificName", o."decimalLatitude" AS latitude, o."decimalLongitude" AS longitude, 
+             o."dayOfYear", o.sst, o.sss, o.depth
+      FROM obis o JOIN scientific_names sn ON o.aphiaid = sn.aphiaid
+      JOIN region_data rd ON o."decimalLatitude" BETWEEN rd.min_lat AND rd.max_lat AND 
+      o."decimalLongitude" BETWEEN rd.min_lon AND rd.max_lon
       LIMIT 100;
     `;
-    
+
     const climateQuery = `
       WITH region_data AS (
-        SELECT 
-          $1::text AS region_id,
-          $2::float AS min_lat,
-          $3::float AS max_lat, 
-          $4::float AS min_lon,
-          $5::float AS max_lon
+        SELECT $1::text AS region_id, $2::float AS min_lat, $3::float AS max_lat, $4::float AS min_lon, $5::float AS max_lon
       )
-      SELECT 
-        AVG(o.sst) AS avg_sst,
-        AVG(o.sss) AS avg_sss,
-        COUNT(*) AS total_observations
-      FROM obis o
-      JOIN region_data rd ON 
-        o."decimalLatitude" BETWEEN rd.min_lat AND rd.max_lat AND
-        o."decimalLongitude" BETWEEN rd.min_lon AND rd.max_lon
+      SELECT AVG(o.sst) AS avg_sst, AVG(o.sss) AS avg_sss, COUNT(*) AS total_observations
+      FROM obis o JOIN region_data rd ON o."decimalLatitude" BETWEEN rd.min_lat AND rd.max_lat 
+      AND o."decimalLongitude" BETWEEN rd.min_lon AND rd.max_lon
       WHERE o.sst IS NOT NULL OR o.sss IS NOT NULL;
     `;
-    
+
     const [obisResult, climateResult] = await Promise.all([
       connection.query(obisQuery, [
         selectedRegion.id,
@@ -576,7 +543,7 @@ const getObisByCoordinates = async (req, res) => {
         selectedRegion.bounds.maxLon
       ])
     ]);
-    
+
     res.json({
       region: selectedRegion,
       obisEntries: obisResult.rows,
@@ -588,6 +555,302 @@ const getObisByCoordinates = async (req, res) => {
   }
 };
 
+
+// INSIGHTS PAGE ROUTES
+const getSpeciesMonthlyTrends = async (req, res) => {
+  const { scientificName } = req.params;
+  try {
+    const result = await connection.query(`
+      WITH monthly_counts AS (
+        SELECT dl."month", COUNT(*) AS occ_count
+        FROM obis o JOIN scientific_names sn ON o.aphiaid = sn.aphiaid
+        JOIN date_lookup dl ON o."dayOfYear" = dl."dayOfYear"
+        WHERE sn."scientificName" ILIKE $1
+        GROUP BY dl."month"
+      ),
+      monthly_counts_with_prev AS (
+        SELECT mc."month", mc.occ_count,
+          CASE
+            WHEN LAG(mc.occ_count, 1, NULL) OVER (ORDER BY mc."month") IS NULL THEN NULL
+            WHEN LAG(mc.occ_count, 1, NULL) OVER (ORDER BY mc."month") = 0 THEN NULL
+            ELSE (mc.occ_count - LAG(mc.occ_count, 1, NULL) OVER (ORDER BY mc."month")) * 100.0 / 
+                 LAG(mc.occ_count, 1, NULL) OVER (ORDER BY mc."month")
+          END AS pct_change
+        FROM monthly_counts mc
+      ),
+      monthly_temp AS (
+        SELECT dl."month", AVG(w.temperature) AS avg_wod_temp
+        FROM wod_2015 w JOIN date_lookup dl ON w."dayOfYear" = dl."dayOfYear"
+        GROUP BY dl."month"
+      )
+      SELECT mc."month", mc.occ_count, mc.pct_change, mt.avg_wod_temp
+      FROM monthly_counts_with_prev mc LEFT JOIN monthly_temp mt ON mc."month" = mt."month"
+      ORDER BY mc."month";
+    `, [`%${scientificName}%`]);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching monthly trends:', err);
+    res.status(500).json([]);
+  }
+};
+
+const getSpeciesShifts = async (req, res) => {
+  const { 
+    minCount = 10, 
+    oldStartDate = '2015-01-01', 
+    oldEndDate = '2015-06-30', 
+    newStartDate = '2015-07-01', 
+    newEndDate = '2015-12-31', 
+    scientificName 
+  } = req.query;
+  
+  try {
+    // Only proceed if scientificName is provided
+    if (!scientificName) {
+      return res.status(400).json({ error: 'Scientific name is required' });
+    }
+
+    console.log(`Processing shifts query for: ${scientificName}`);
+    console.log(`Time periods: ${oldStartDate} to ${oldEndDate} and ${newStartDate} to ${newEndDate}`);
+    console.log(`Minimum count: ${minCount}`);
+
+    // Convert dates to day-of-year values for the query (1-366)
+    const getDayOfYear = (dateString) => {
+      try {
+        // Parse the input date string
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+          console.error(`Invalid date provided: ${dateString}`);
+          return null;
+        }
+        
+        // Force the year to 2015 to ensure consistency
+        const fixedYear = 2015;
+        
+        // Create a date object for the input date but with year forced to 2015
+        const adjustedDate = new Date(fixedYear, date.getMonth(), date.getDate());
+        
+        // Create Jan 1st of the same year
+        const firstDayOfYear = new Date(fixedYear, 0, 1);
+        
+        // Calculate difference in days
+        const diff = adjustedDate - firstDayOfYear;
+        const oneDay = 1000 * 60 * 60 * 24;
+        const dayOfYear = Math.floor(diff / oneDay) + 1;
+        
+        console.log(`Converted ${dateString} to day of year: ${dayOfYear}`);
+        return dayOfYear;
+      } catch (err) {
+        console.error(`Error converting date ${dateString}: ${err.message}`);
+        return 1; // Default to day 1 on error
+      }
+    };
+
+    // Handle a special case: if the date range crosses from December to January
+    let oldStart = getDayOfYear(oldStartDate);
+    let oldEnd = getDayOfYear(oldEndDate);
+    let newStart = getDayOfYear(newStartDate);
+    let newEnd = getDayOfYear(newEndDate);
+    
+    // Special handling for date ranges that cross year boundaries
+    // This is only needed if we're using dates from multiple years
+    // For ranges like "Dec 1 to Feb 28", we need WHERE dayOfYear >= 335 OR dayOfYear <= 59
+    let oldStartWhere, oldEndWhere, newStartWhere, newEndWhere;
+    let useCrossYearQuery = false;
+    
+    if (oldStart > oldEnd) {
+      console.log("First period crosses year boundary, using special query logic");
+      useCrossYearQuery = true;
+      oldStartWhere = `(o."dayOfYear" >= ${oldStart} OR o."dayOfYear" <= ${oldEnd})`;
+    } else {
+      oldStartWhere = `o."dayOfYear" BETWEEN ${oldStart} AND ${oldEnd}`;
+    }
+    
+    if (newStart > newEnd) {
+      console.log("Second period crosses year boundary, using special query logic");
+      useCrossYearQuery = true;
+      newStartWhere = `(o."dayOfYear" >= ${newStart} OR o."dayOfYear" <= ${newEnd})`;
+    } else {
+      newStartWhere = `o."dayOfYear" BETWEEN ${newStart} AND ${newEnd}`;
+    }
+
+    console.log(`Query will use day values: ${oldStart}-${oldEnd} and ${newStart}-${newEnd}`);
+    
+    // Choose the appropriate query based on whether we have cross-year ranges
+    let query;
+    if (useCrossYearQuery) {
+      query = `
+        WITH first_half_observations AS (
+          -- Get species observations from the first period that meet minimum count
+          SELECT 
+            o.aphiaid,
+            COUNT(*) as count,
+            AVG(o."decimalLatitude") as avg_lat,
+            AVG(o."decimalLongitude") as avg_lon
+          FROM 
+            obis o
+          JOIN
+            scientific_names sn ON o.aphiaid = sn.aphiaid
+          WHERE 
+            ${oldStartWhere}
+            AND sn."scientificName" ILIKE $1
+          GROUP BY 
+            o.aphiaid
+          HAVING 
+            COUNT(*) >= $2
+        ),
+        second_half_observations AS (
+          -- Get species observations from the second period that meet minimum count
+          SELECT 
+            o.aphiaid,
+            COUNT(*) as count,
+            AVG(o."decimalLatitude") as avg_lat,
+            AVG(o."decimalLongitude") as avg_lon
+          FROM 
+            obis o
+          JOIN
+            scientific_names sn ON o.aphiaid = sn.aphiaid
+          WHERE 
+            ${newStartWhere}
+            AND sn."scientificName" ILIKE $1
+          GROUP BY 
+            o.aphiaid
+          HAVING 
+            COUNT(*) >= $2
+        ),
+        species_with_both_halves AS (
+          -- Find species that appear in both periods with sufficient observations
+          SELECT 
+            fh.aphiaid,
+            fh.avg_lat as first_half_lat,
+            fh.avg_lon as first_half_lon,
+            sh.avg_lat as second_half_lat,
+            sh.avg_lon as second_half_lon,
+            fh.count as first_half_count,
+            sh.count as second_half_count
+          FROM 
+            first_half_observations fh
+          JOIN 
+            second_half_observations sh ON fh.aphiaid = sh.aphiaid
+        )
+        -- Calculate distance between centroids (using Haversine formula)
+        SELECT 
+          sb.aphiaid as id,
+          sb.first_half_lat,
+          sb.first_half_lon,
+          sb.second_half_lat,
+          sb.second_half_lon,
+          sb.first_half_count,
+          sb.second_half_count,
+          -- Haversine formula to calculate distance in kilometers
+          2 * 6371 * ASIN(
+            SQRT(
+              POW(SIN(RADIANS(sb.second_half_lat - sb.first_half_lat) / 2), 2) + 
+              COS(RADIANS(sb.first_half_lat)) * COS(RADIANS(sb.second_half_lat)) * 
+              POW(SIN(RADIANS(sb.second_half_lon - sb.first_half_lon) / 2), 2)
+            )
+          ) as "shiftDist"
+        FROM 
+          species_with_both_halves sb
+        ORDER BY 
+          "shiftDist" DESC
+        LIMIT 100;
+      `;
+      
+      result = await connection.query(query, [`%${scientificName}%`, minCount]);
+      
+    } else {
+      // Standard query for non-crossing date ranges
+      query = `
+        WITH first_half_observations AS (
+          -- Get species observations from the first half of the year that meet minimum count
+          SELECT 
+            o.aphiaid,
+            COUNT(*) as count,
+            AVG(o."decimalLatitude") as avg_lat,
+            AVG(o."decimalLongitude") as avg_lon
+          FROM 
+            obis o
+          JOIN
+            scientific_names sn ON o.aphiaid = sn.aphiaid
+          WHERE 
+            o."dayOfYear" BETWEEN $1 AND $2
+            AND sn."scientificName" ILIKE $6
+          GROUP BY 
+            o.aphiaid
+          HAVING 
+            COUNT(*) >= $5
+        ),
+        second_half_observations AS (
+          -- Get species observations from the second half of the year that meet minimum count
+          SELECT 
+            o.aphiaid,
+            COUNT(*) as count,
+            AVG(o."decimalLatitude") as avg_lat,
+            AVG(o."decimalLongitude") as avg_lon
+          FROM 
+            obis o
+          JOIN
+            scientific_names sn ON o.aphiaid = sn.aphiaid
+          WHERE 
+            o."dayOfYear" BETWEEN $3 AND $4
+            AND sn."scientificName" ILIKE $6
+          GROUP BY 
+            o.aphiaid
+          HAVING 
+            COUNT(*) >= $5
+        ),
+        species_with_both_halves AS (
+          -- Find species that appear in both halves with sufficient observations
+          SELECT 
+            fh.aphiaid,
+            fh.avg_lat as first_half_lat,
+            fh.avg_lon as first_half_lon,
+            sh.avg_lat as second_half_lat,
+            sh.avg_lon as second_half_lon,
+            fh.count as first_half_count,
+            sh.count as second_half_count
+          FROM 
+            first_half_observations fh
+          JOIN 
+            second_half_observations sh ON fh.aphiaid = sh.aphiaid
+        )
+        -- Calculate distance between centroids (using Haversine formula)
+        SELECT 
+          sb.aphiaid as id,
+          sb.first_half_lat,
+          sb.first_half_lon,
+          sb.second_half_lat,
+          sb.second_half_lon,
+          sb.first_half_count,
+          sb.second_half_count,
+          -- Haversine formula to calculate distance in kilometers
+          2 * 6371 * ASIN(
+            SQRT(
+              POW(SIN(RADIANS(sb.second_half_lat - sb.first_half_lat) / 2), 2) + 
+              COS(RADIANS(sb.first_half_lat)) * COS(RADIANS(sb.second_half_lat)) * 
+              POW(SIN(RADIANS(sb.second_half_lon - sb.first_half_lon) / 2), 2)
+            )
+          ) as "shiftDist"
+        FROM 
+          species_with_both_halves sb
+        ORDER BY 
+          "shiftDist" DESC
+        LIMIT 100;
+      `;
+      
+      result = await connection.query(query, [oldStart, oldEnd, newStart, newEnd, minCount, `%${scientificName}%`]);
+    }
+
+    console.log(`Found ${result.rows.length} results`);
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching species shifts:', err);
+    res.status(500).json([]);
+  }
+};
 router.get('/test', test);
 router.get('/species/most-observed', getMostObservedSpecies);
 router.get('/species/name/:scientificName', getSpeciesByName);
@@ -600,7 +863,7 @@ router.get('/regions/species', getRegionSpecies);
 router.get('/obis/coordinates/:lat/:lng', getObisByCoordinates);
 
 router.get('/search_species', searchSpecies);
-router.get('/species/:id', getSpeciesInfoById);
+//router.get('/species/:id', getSpeciesInfoById);
 router.get('/species/shifts', getSpeciesShifts);
 
 router.get('/species/search', getAllSpecies);
@@ -617,7 +880,7 @@ module.exports = {
   getRegions,
   getObisByCoordinates,
   getAllSpecies,
-  getSpeciesInfoById,
+  //getSpeciesInfoById,
   getSpeciesShifts,
   searchSpecies
 };
