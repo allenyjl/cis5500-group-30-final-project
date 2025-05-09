@@ -41,22 +41,48 @@ const test = async (req, res) => {
 
 
 // SPECIES PAGE ROUTES
-// const getSpeciesInfoById = async (req, res) => {
-//   const { id } = req.params;
-//   try {
-//     const result = await connection.query(/* full SQL I gave earlier */);
-//     res.json(result.rows[0] || {});
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json([]);
-//   }
-// };
 
 
+
+const getSpeciesShifts = async (req, res) => {
+  const { minCount, oldStart, oldEnd, newStart, newEnd } = req.query;
+  try {
+    const result = await connection.query(/* full SQL I gave earlier */);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json([]);
+  }
+};
+
+const getMarineBrackishCounts = async (req, res) => {
+  try {
+    const result = await connection.query(`
+      SELECT
+        CASE 
+          WHEN marine = true AND brackish = true THEN 'Both Marine and Brackish'
+          WHEN marine = true THEN 'Marine Only'
+          WHEN brackish = true THEN 'Brackish Only'
+          ELSE 'Neither'
+        END AS habitat_type,
+        COUNT(DISTINCT aphiaid) AS species_count
+      FROM obis
+      WHERE marine IS NOT NULL OR brackish IS NOT NULL
+      GROUP BY habitat_type
+      ORDER BY species_count DESC;
+    `);
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching marine/brackish counts:', err);
+    res.status(500).json([]);
+  }
+};
 
 const searchSpecies = async (req, res) => {
   console.log('--- /search_species called ---');
   console.log('query params:', req.query);
+
   const {
     scientificName,
     marine,
@@ -70,13 +96,16 @@ const searchSpecies = async (req, res) => {
     maxTemperature,
   } = req.query;
 
-  let query = `
-    SELECT sn.aphiaid AS id, sn."scientificName"
+  let baseQuery = `
+    SELECT sn.aphiaid AS id, sn."scientificName", COUNT(*) AS sightings
     FROM scientific_names sn
     JOIN obis o ON sn.aphiaid = o.aphiaid
+    LEFT JOIN wod_2015 w 
+      ON o."dayOfYear" = w."dayOfYear"
   `;
-  let where = [];
-  let params = [];
+
+  const where = [];
+  const params = [];
   let idx = 1;
 
   if (scientificName) {
@@ -88,28 +117,29 @@ const searchSpecies = async (req, res) => {
     where.push(`o.marine = $${idx++}`);
     params.push(true);
   }
+
   if (brackish === 'true') {
     where.push(`o.brackish = $${idx++}`);
     params.push(true);
   }
 
   if (minDepth) {
-    where.push(`o.depth >= $${idx++}`);
+    where.push(`w.depth >= $${idx++}`);
     params.push(Number(minDepth));
   }
 
   if (maxDepth) {
-    where.push(`o.depth <= $${idx++}`);
+    where.push(`w.depth <= $${idx++}`);
     params.push(Number(maxDepth));
   }
 
   if (minTemperature) {
-    where.push(`o.temperature >= $${idx++}`);
+    where.push(`w.temperature >= $${idx++}`);
     params.push(Number(minTemperature));
   }
 
   if (maxTemperature) {
-    where.push(`o.temperature <= $${idx++}`);
+    where.push(`w.temperature <= $${idx++}`);
     params.push(Number(maxTemperature));
   }
 
@@ -119,42 +149,113 @@ const searchSpecies = async (req, res) => {
     params.push(regionList);
   }
 
-  if (minSightings || maxSightings) {
-    query = `
-      SELECT id, "scientificName" FROM (
-        SELECT sn.aphiaid AS id, sn."scientificName", COUNT(*) AS sightings
-        FROM scientific_names sn
-        JOIN obis o ON sn.aphiaid = o.aphiaid
-        ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-        GROUP BY sn.aphiaid, sn."scientificName"
-      ) sub
-      WHERE 1=1
-    `;
-    if (minSightings) {
-      query += ` AND sightings >= $${idx++}`;
-      params.push(Number(minSightings));
-    }
-    if (maxSightings) {
-      query += ` AND sightings <= $${idx++}`;
-      params.push(Number(maxSightings));
-    }
-  } else if (where.length) {
-    query += ' WHERE ' + where.join(' AND ');
+  if (where.length > 0) {
+    baseQuery += ' WHERE ' + where.join(' AND ');
   }
 
-  query += ' GROUP BY sn.aphiaid, sn."scientificName" LIMIT 100';
+  baseQuery += ' GROUP BY sn.aphiaid, sn."scientificName"';
+
+  let finalQuery = `
+    SELECT id, "scientificName", sightings FROM (
+      ${baseQuery}
+    ) AS sub
+    WHERE 1=1
+  `;
+
+  if (minSightings) {
+    finalQuery += ` AND sightings >= $${idx++}`;
+    params.push(Number(minSightings));
+  }
+
+  if (maxSightings) {
+    finalQuery += ` AND sightings <= $${idx++}`;
+    params.push(Number(maxSightings));
+  }
+
+  finalQuery += ' LIMIT 100';
 
   try {
-    console.log('Final SQL:', query);
+    console.log('Final SQL:', finalQuery);
     console.log('Final params:', params);
-    const result = await connection.query(query, params);
+    const result = await connection.query(finalQuery, params);
     res.json(result.rows);
   } catch (err) {
-    console.error('Error in search_species:', err);
+    console.error('Error in search_species with wod_2015 join:', err);
     res.status(500).json([]);
   }
 };
 
+
+const getSpeciesByMonth = async (req, res) => {
+  try {
+    const result = await connection.query(`
+      WITH month_observations AS (
+        SELECT 
+          CEIL("dayOfYear" / 30.5) AS month_num
+        FROM obis
+        WHERE "dayOfYear" IS NOT NULL
+        LIMIT 100000
+      )
+      SELECT 
+        CASE month_num
+          WHEN 1 THEN 'January'
+          WHEN 2 THEN 'February'
+          WHEN 3 THEN 'March'
+          WHEN 4 THEN 'April'
+          WHEN 5 THEN 'May'
+          WHEN 6 THEN 'June'
+          WHEN 7 THEN 'July'
+          WHEN 8 THEN 'August'
+          WHEN 9 THEN 'September'
+          WHEN 10 THEN 'October'
+          WHEN 11 THEN 'November'
+          WHEN 12 THEN 'December'
+          ELSE 'December'
+        END AS month,
+        COUNT(*) AS observation_count
+      FROM month_observations
+      GROUP BY month_num
+      ORDER BY month_num;
+    `);
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching species by month:', err);
+    res.status(500).json([]);
+  }
+};
+
+const getRandomSpecies = async (req, res) => {
+  try {
+    // Get the total number of observations
+    const totalResult = await connection.query(`
+      SELECT COUNT(*) AS total_count
+      FROM obis
+    `);
+    
+    const totalCount = parseInt(totalResult.rows[0].total_count);
+    
+    // Get random species with observation counts and rarity (without total_observations column)
+    const result = await connection.query(`
+      SELECT 
+        sn.aphiaid AS id,
+        sn."scientificName",
+        COUNT(o.id) AS observation_count,
+        ROUND(((COUNT(o.id)::float / $1::float) * 100)::numeric, 6) AS percentage_of_total,
+        (1 - (COUNT(o.id)::float / $1::float)) AS rarity_score
+      FROM scientific_names sn
+      JOIN obis o ON sn.aphiaid = o.aphiaid
+      GROUP BY sn.aphiaid, sn."scientificName"
+      ORDER BY RANDOM()
+      LIMIT 10;
+    `, [totalCount]);
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching random species with rarity:', err);
+    res.status(500).json([]);
+  }
+};
 
 
 const getMostObservedSpecies = async (req, res) => {
@@ -172,6 +273,44 @@ const getMostObservedSpecies = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error(err);
+    res.status(500).json([]);
+  }
+};
+
+const getSpeciesCooccurrence = async (req, res) => {
+  try {
+    const result = await connection.query(`
+      WITH species_locations AS (
+        SELECT 
+          o.aphiaid,
+          sn."scientificName",
+          ROUND(o."decimalLatitude"::numeric, 1) AS lat_grid,
+          ROUND(o."decimalLongitude"::numeric, 1) AS lon_grid
+        FROM obis o
+        JOIN scientific_names sn ON o.aphiaid = sn.aphiaid
+        GROUP BY o.aphiaid, sn."scientificName", lat_grid, lon_grid
+      ),
+      cooccurrences AS (
+        SELECT 
+          a."scientificName" AS species_a,
+          b."scientificName" AS species_b,
+          COUNT(*) AS times_together
+        FROM species_locations a
+        JOIN species_locations b ON 
+          a.lat_grid = b.lat_grid AND
+          a.lon_grid = b.lon_grid AND
+          a.aphiaid < b.aphiaid
+        GROUP BY species_a, species_b
+        HAVING COUNT(*) > 5
+      )
+      SELECT * FROM cooccurrences
+      ORDER BY times_together DESC
+      LIMIT 20;
+    `);
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching species co-occurrence:', err);
     res.status(500).json([]);
   }
 };
@@ -710,18 +849,19 @@ const getSpeciesShifts = async (req, res) => {
 router.get('/test', test);
 router.get('/species/most-observed', getMostObservedSpecies);
 router.get('/species/name/:scientificName', getSpeciesByName);
-router.get('/species/monthly-trends/:scientificName', getSpeciesMonthlyTrends);
 router.get('/regions', getRegions);
 router.get('/regions/temperature', getRegionTemperature);
 router.get('/regions/water-properties', getRegionSalinityAndPH);
 router.get('/regions/species/:region', getRegionSpecies);
 router.get('/regions/species', getRegionSpecies);
 router.get('/obis/coordinates/:lat/:lng', getObisByCoordinates);
-
+router.get('/species/habitat-counts', getMarineBrackishCounts);
+router.get('/species/by-month', getSpeciesByMonth);
 router.get('/search_species', searchSpecies);
-//router.get('/species/:id', getSpeciesInfoById);
-router.get('/species/shifts', getSpeciesShifts);
 
+router.get('/species/shifts', getSpeciesShifts);
+router.get('/species/cooccurrence', getSpeciesCooccurrence);
+router.get('/species/random', getRandomSpecies);
 router.get('/species/search', getAllSpecies);
 
 module.exports = {
@@ -729,14 +869,16 @@ module.exports = {
   test,
   getMostObservedSpecies,
   getSpeciesByName,
-  getSpeciesMonthlyTrends,
   getRegionTemperature,
   getRegionSalinityAndPH,
   getRegionSpecies,
   getRegions,
   getObisByCoordinates,
   getAllSpecies,
-  //getSpeciesInfoById,
+  getRandomSpecies,
   getSpeciesShifts,
+  getMarineBrackishCounts,
+  getSpeciesByMonth,
+  getSpeciesCooccurrence,
   searchSpecies
 };
