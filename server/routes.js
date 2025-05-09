@@ -42,19 +42,6 @@ const test = async (req, res) => {
 
 // SPECIES PAGE ROUTES
 
-
-
-// const getSpeciesShifts = async (req, res) => {
-//   const { minCount, oldStart, oldEnd, newStart, newEnd } = req.query;
-//   try {
-//     const result = await connection.query(/* full SQL I gave earlier */);
-//     res.json(result.rows);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json([]);
-//   }
-// };
-
 const getMarineBrackishCounts = async (req, res) => {
   try {
     const result = await connection.query(`
@@ -729,7 +716,6 @@ const getSpeciesShifts = async (req, res) => {
 
     const query = `
       WITH first_half_observations AS (
-        -- Get species observations from the first period that meet minimum count
         SELECT o.aphiaid, COUNT(*) as count, AVG(o."decimalLatitude") as avg_lat, AVG(o."decimalLongitude") as avg_lon
         FROM obis o JOIN scientific_names sn ON o.aphiaid = sn.aphiaid
         WHERE o."dayOfYear" BETWEEN $1 AND $2 AND sn."scientificName" ILIKE $6
@@ -737,7 +723,6 @@ const getSpeciesShifts = async (req, res) => {
         HAVING COUNT(*) >= $5
       ),
       second_half_observations AS (
-        -- Get species observations from the second period that meet minimum count
         SELECT o.aphiaid, COUNT(*) as count, AVG(o."decimalLatitude") as avg_lat, AVG(o."decimalLongitude") as avg_lon
         FROM obis o
         JOIN scientific_names sn ON o.aphiaid = sn.aphiaid
@@ -746,12 +731,10 @@ const getSpeciesShifts = async (req, res) => {
         HAVING COUNT(*) >= $5
       ),
       species_with_both_halves AS (
-        -- Find species that appear in both periods with sufficient observations
         SELECT fh.aphiaid,fh.avg_lat as first_half_lat, fh.avg_lon as first_half_lon, sh.avg_lat as second_half_lat, 
         sh.avg_lon as second_half_lon, fh.count as first_half_count, sh.count as second_half_count
         FROM first_half_observations fh JOIN second_half_observations sh ON fh.aphiaid = sh.aphiaid
       )
-      -- Calculate distance between centroids
       SELECT sb.aphiaid as id, sb.first_half_lat, sb.first_half_lon, sb.second_half_lat, sb.second_half_lon, sb.first_half_count, sb.second_half_count,
         -- Haversine formula to calculate distance in kilometers
         2 * 6371 * ASIN(
@@ -788,7 +771,7 @@ router.get('/obis/coordinates/:lat/:lng', getObisByCoordinates);
 router.get('/species/habitat-counts', getMarineBrackishCounts);
 // router.get('/species/by-month', getSpeciesByMonth);
 router.get('/search_species', searchSpecies);
-
+router.get('/species/monthly-trends/:scientificName', getSpeciesMonthlyTrends);
 router.get('/species/shifts', getSpeciesShifts);
 router.get('/species/cooccurrence', getSpeciesCooccurrence);
 router.get('/species/random', getRandomSpecies);
