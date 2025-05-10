@@ -5,52 +5,15 @@ const API_URL = 'http://localhost:8080';
 
 export default function SpeciesPage() {
   const [topSpecies, setTopSpecies] = useState([]);
-  const [searchName, setSearchName] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [speciesDetail, setSpeciesDetail] = useState(null);
-  const [speciesShifts, setSpeciesShifts] = useState([]);
   const [loadingTop, setLoadingTop] = useState(false);
-  const [loadingSearch, setLoadingSearch] = useState(false);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [loadingShifts, setLoadingShifts] = useState(false);
-  const [advancedResults, setAdvancedResults] = useState([]);
   const [habitatCounts, setHabitatCounts] = useState([]);
-const [loadingHabitat, setLoadingHabitat] = useState(false);
-const [speciesByMonth, setSpeciesByMonth] = useState([]);
-const [loadingByMonth, setLoadingByMonth] = useState(false);
-const [cooccurrenceData, setCooccurrenceData] = useState([]);
-const [loadingCooccurrence, setLoadingCooccurrence] = useState(false);
-const [randomSpecies, setRandomSpecies] = useState([]);
-const [loadingRandom, setLoadingRandom] = useState(false);
-
-const [advancedFilters, setAdvancedFilters] = useState({
-  scientificName: '',
-  marine: false,
-  brackish: false,
-  minSightings: '',
-  maxSightings: '',
-  minDepth: '',
-  maxDepth: '',
-  minTemperature: '',
-  maxTemperature: '',
-});
-const handleAdvancedSearch = () => {
-  setLoadingAdvanced(true);
-  const params = new URLSearchParams();
-
-  Object.entries(advancedFilters).forEach(([key, value]) => {
-    if (value !== '' && value !== false) {
-      params.append(key, value);
-    }
-  });
-
-  fetch(`${API_URL}/search_species?${params.toString()}`)
-    .then(res => res.json())
-    .then(data => setAdvancedResults(data))
-    .catch(err => console.error(err))
-    .finally(() => setLoadingAdvanced(false));
-};
-const [loadingAdvanced, setLoadingAdvanced] = useState(false);
+  const [loadingHabitat, setLoadingHabitat] = useState(false);
+  const [speciesByMonth, setSpeciesByMonth] = useState([]);
+  const [loadingByMonth, setLoadingByMonth] = useState(false);
+  const [cooccurrenceData, setCooccurrenceData] = useState([]);
+  const [loadingCooccurrence, setLoadingCooccurrence] = useState(false);
+  const [randomSpecies, setRandomSpecies] = useState([]);
+  const [loadingRandom, setLoadingRandom] = useState(false);
 
 useEffect(() => {
   setLoadingTop(true);
@@ -69,7 +32,7 @@ useEffect(() => {
     .finally(() => setLoadingHabitat(false));
 
     setLoadingByMonth(true);
-fetch(`${API_URL}/species/by-month`)
+  fetch(`${API_URL}/species/by-month`)
   .then(res => res.json())
   .then(data => setSpeciesByMonth(data))
   .catch(err => console.error(err))
@@ -83,60 +46,13 @@ fetch(`${API_URL}/species/by-month`)
     
 
 }, []);
-const handleFetchRandomSpecies = () => {
-  setLoadingRandom(true);
-  fetch(`${API_URL}/species/random`)
-    .then(res => res.json())
-    .then(data => setRandomSpecies(data))
-    .catch(err => console.error(err))
-    .finally(() => setLoadingRandom(false));
-};
-  const handleSearch = () => {
-    if (!searchName) return;
-    setLoadingSearch(true);
-    fetch(`${API_URL}/species/name/${encodeURIComponent(searchName)}`)
+  const handleFetchRandomSpecies = () => {
+    setLoadingRandom(true);
+    fetch(`${API_URL}/species/random`)
       .then(res => res.json())
-      .then(data => setSearchResults(data))
+      .then(data => setRandomSpecies(data))
       .catch(err => console.error(err))
-      .finally(() => setLoadingSearch(false));
-  };
-
-  const handleFetchDetail = (id) => {
-    setLoadingDetail(true);
-    fetch(`${API_URL}/species/${id}`)
-      .then(res => res.json())
-      .then(data => setSpeciesDetail(data))
-      .catch(err => console.error(err))
-      .finally(() => setLoadingDetail(false));
-  };
-
-  const handleFetchShifts = () => {
-    setLoadingShifts(true);
-    fetch(`${API_URL}/species/shifts`)
-      .then(res => res.json())
-      .then(data => setSpeciesShifts(data))
-      .catch(err => console.error(err))
-      .finally(() => setLoadingShifts(false));
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const cleanDateString = dateString.split('T')[0];
-    const [year, month, day] = cleanDateString.split('-').map(num => parseInt(num, 10));
-    if (!year || !month || !day) return 'N/A';
-    return `${month}/${day}/${year}`;
-  };
-
-  const formatCoordinate = (coord) => {
-    if (coord === null || coord === undefined) return 'N/A';
-    return parseFloat(coord).toFixed(4);
-  };
-
-  const formatRegion = (regionId) => {
-    if (!regionId) return 'Unknown';
-    return regionId
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, str => str.toUpperCase());
+      .finally(() => setLoadingRandom(false));
   };
 
   return (
@@ -164,68 +80,6 @@ const handleFetchRandomSpecies = () => {
           </table>
         )}
       </section>
-
-      <section>
-        <h2>Search Species by Scientific Name</h2>
-        <input
-          type="text"
-          value={searchName}
-          onChange={e => setSearchName(e.target.value)}
-          placeholder="Enter scientific name"
-        />
-        <button onClick={handleSearch}>Search</button>
-        {loadingSearch ? (
-          <p>Searching...</p>
-        ) : searchResults.length > 0 ? (
-          <table>
-            <thead>
-              <tr>
-                <th>Scientific Name</th>
-                <th>Region</th>
-                <th>Date</th>
-                <th>Longitude</th>
-                <th>Latitude</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {searchResults.map((row, idx) => (
-                <tr key={idx}>
-                  <td>{row.scientificName}</td>
-                  <td>{formatRegion(row.region_id)}</td>
-                  <td>{formatDate(row.eventDate)}</td>
-                  <td>{formatCoordinate(row.longitude)}</td>
-                  <td>{formatCoordinate(row.latitude)}</td>
-                  <td>
-                    <button onClick={() => handleFetchDetail(row.id)}>Details</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          searchName && <p>No results found.</p>
-        )}
-      </section>
-
-      {speciesDetail && (
-        <section>
-          <h2>Species Details</h2>
-          {loadingDetail ? (
-            <p>Loading details...</p>
-          ) : (
-            <div>
-              <p><strong>Scientific Name:</strong> {speciesDetail.scientificName}</p>
-              <p><strong>Family:</strong> {speciesDetail.family}</p>
-              <p><strong>Marine:</strong> {speciesDetail.marine ? 'Yes' : 'No'}</p>
-              <p><strong>Brackish:</strong> {speciesDetail.brackish ? 'Yes' : 'No'}</p>
-              <p><strong>Average Depth:</strong> {speciesDetail.averageDepth}</p>
-              <p><strong>Average Temperature:</strong> {speciesDetail.averageTemperature}</p>
-              <p><strong>Top Regions:</strong> {speciesDetail.topRegions.join(', ')}</p>
-            </div>
-          )}
-        </section>
-      )}
 
       <section>
         <h2>Species by Habitat Type</h2>

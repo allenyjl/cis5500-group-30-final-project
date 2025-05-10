@@ -172,7 +172,7 @@ export default function AdvancedSpeciesSearch() {
                     <Slider
                         value={sightings}
                         min={1}
-                        max={1000000}
+                        max={200000}
                         onChange={(e, newValue) => setSightings(newValue)}
                         valueLabelDisplay='auto'
                     />
