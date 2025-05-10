@@ -95,7 +95,7 @@ const searchSpecies = (req, res) => {
   const tempMin = req.query.temp_min;
   const tempMax = req.query.temp_max;
 
-  // Base query - CORRECTED
+  // Base query
   let query = `
   SELECT sn."scientificName", COUNT(*) as num_sightings
   FROM scientific_names sn
@@ -108,8 +108,8 @@ const searchSpecies = (req, res) => {
   // Habitat conditions
   if (marine || brackish) {
   const habitats = [];
-  if (marine) habitats.push('o.marine = true'); // Corrected: reference 'o' table
-  if (brackish) habitats.push('o.brackish = true'); // Corrected: reference 'o' table
+  if (marine) habitats.push('o.marine = true'); 
+  if (brackish) habitats.push('o.brackish = true'); 
   whereClauses.push(`(${habitats.join(' OR ')})`);
   }
 
@@ -141,6 +141,61 @@ const searchSpecies = (req, res) => {
       }
   });
 };
+
+const detailedSpeciesInfo = async (req, res) => {
+
+  console.log('Route hit with params:', req.params);
+  console.log('Scientific name:', req.params.scientificName);
+
+  const { scientificName } = req.params;
+  
+  connection.query(`
+  WITH species_data AS (
+      SELECT o.marine, o.brackish, o.depth,
+              w.temperature, w.salinity, w.phosphate, w.nitrate,
+              w.chlorophyll, w.ph, sn."scientificName", f.family
+      FROM obis o
+      LEFT JOIN wod_2015 w
+          ON o.grid_id = w.grid_id
+          AND o.depth_id = w.depth_id
+          AND o."dayOfYear" = w."dayOfYear"
+      JOIN scientific_names sn ON o.aphiaid = sn.aphiaid
+      JOIN families f ON sn."scientificName" = f."scientificName"
+      WHERE sn."scientificName" ILIKE '${scientificName}%'
+  )
+  SELECT
+      CASE
+          WHEN bool_or(marine) = true THEN true
+          WHEN bool_and(marine IS false) THEN false
+          ELSE null
+      END as marine,
+      CASE
+          WHEN bool_or(brackish) = true THEN true
+          WHEN bool_and(brackish IS false) THEN false
+          ELSE null
+      END as brackish,
+      CASE WHEN COUNT(depth) = 0 THEN null ELSE AVG(depth) END as averageDepth,
+      CASE WHEN COUNT(temperature) = 0 THEN null ELSE AVG(temperature) END as averageTemperature,
+      CASE WHEN COUNT(salinity) = 0 THEN null ELSE AVG(salinity) END as averageSalinity,
+      CASE WHEN COUNT(phosphate) = 0 THEN null ELSE AVG(phosphate) END as averagePhosphate,
+      CASE WHEN COUNT(nitrate) = 0 THEN null ELSE AVG(nitrate) END as averageNitrate,
+      CASE WHEN COUNT(chlorophyll) = 0 THEN null ELSE AVG(chlorophyll) END as averageChlorophyll,
+      CASE WHEN COUNT(ph) = 0 THEN null ELSE AVG(ph) END as averagePh,
+      "scientificName",
+      "family"
+  FROM species_data
+  GROUP BY "scientificName", family;`, (err, data)=> {
+    if (err) {
+      console.log(err);
+      return res.status(500).json({ message: "Server error" });
+    } else if (data.rows.length === 0) {
+      return res.status(404).json({ message: "Species not found" });
+    } else {
+      res.json(data.rows[0]);
+      console.log('Successfully returned data:', data.rows);
+    }
+  })
+}
 
 const getRandomSpecies = async (req, res) => {
   try {
@@ -776,6 +831,7 @@ router.get('/species/shifts', getSpeciesShifts);
 router.get('/species/cooccurrence', getSpeciesCooccurrence);
 router.get('/species/random', getRandomSpecies);
 router.get('/species/search', getAllSpecies);
+router.get('/species/details/:scientificName', detailedSpeciesInfo);
 
 module.exports = {
   router,

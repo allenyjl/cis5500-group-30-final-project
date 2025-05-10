@@ -1,7 +1,8 @@
 // AdvancedSpeciesSearch.js
 import { useState, useCallback } from 'react';
-import { Checkbox, Container, FormControlLabel, Grid, Slider, TextField, Button } from '@mui/material';
+import { Checkbox, Container, FormControlLabel, Grid, Slider, TextField, Button, Link } from '@mui/material';
 import LazyTable from './LazyTable';
+import { SpeciesModal}  from './SpeciesModal';
 
 const API_URL = 'http://localhost:8080';
 
@@ -14,12 +15,65 @@ export default function AdvancedSpeciesSearch() {
     const [temperature, setTemperature] = useState([0, 40]);
     const [marine, setMarine] = useState(false);
     const [brackish, setBrackish] = useState(false);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedSpecies, setSelectedSpecies] = useState(null);
+    const [loadingSpecies, setLoadingSpecies] = useState(false);
 
-    // Define columns for the table
+    // Function to fetch species details
+    const fetchSpeciesDetails = async (scientificName) => {
+      setLoadingSpecies(true);
+      try {
+          const response = await fetch(`${API_URL}/species/details/${encodeURIComponent(scientificName)}`);
+          
+          if (!response.ok) {
+              const errorData = await response.json();
+              if (response.status === 404) {
+                  console.error('Species not found:', errorData.message);
+                  setSelectedSpecies({ error: 'Species not found' });
+              } else {
+                  console.error('Server error:', errorData.message);
+                  setSelectedSpecies({ error: 'Server error occurred' });
+              }
+              return;
+          }
+  
+          const data = await response.json();
+          setSelectedSpecies(data);
+      } catch (error) {
+          console.error('Network error:', error);
+          setSelectedSpecies({ error: 'Network error occurred' });
+      } finally {
+          setLoadingSpecies(false);
+      }
+    };
+
     const columns = [
-      { field: 'scientificName', headerName: 'Scientific Name', width: 300 },
-      { field: 'num_sightings', headerName: 'Number of Sightings', width: 200 }
-  ];
+        {
+            field: 'scientificName',
+            headerName: 'Scientific Name',
+            width: 300,
+            renderCell: (row) => (
+                <Link
+                  component="span"  // using span instead of button
+                  onClick={() => {
+                    setModalOpen(true);
+                    fetchSpeciesDetails(row.scientificName);
+                  }}
+                  sx={{ 
+                    color: 'primary.main',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      textDecoration: 'underline'
+                    }
+                  }}
+                >
+                  {row.scientificName}
+                </Link>
+              )
+        },
+        { field: 'num_sightings', headerName: 'Number of Sightings', width: 200 }
+    ];
 
     // Search state (what we actually search with)
     const [searchParams, setSearchParams] = useState({
@@ -169,6 +223,14 @@ export default function AdvancedSpeciesSearch() {
                 columns={columns}
                 defaultPageSize={10}
                 rowsPerPageOptions={[5, 10, 25]}
+            />
+
+            {/* Modal component */}
+            <SpeciesModal
+                open={modalOpen}
+                onClose={() => setModalOpen(false)}
+                speciesData={selectedSpecies}
+                isLoading={loadingSpecies}
             />
         </Container>
     );
